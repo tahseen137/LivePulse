@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LivePulse — Feel a City Before You Go</title>
+<meta name="description" content="The world's first city consciousness engine. Compare cities through heartbeats, emotional weather, and AI intelligence. 40+ global cities.">
+<meta property="og:title" content="LivePulse — City Consciousness Engine">
+<meta property="og:description" content="Feel a city before you go. Not spreadsheets. Heartbeats, moods, and an AI Oracle.">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#050505;--fg:#e8e8e8;--muted:#666;--accent:#FF6B35;--accent2:#4A90D9;--accent3:#F7C948;--surface:rgba(255,255,255,.03);--border:rgba(255,255,255,.06)}
+body{background:var(--bg);color:var(--fg);font-family:'DM Sans',system-ui,sans-serif;overflow-x:hidden;line-height:1.6}
+a{color:var(--accent);text-decoration:none}
+.container{max-width:1100px;margin:0 auto;padding:0 24px}
+
+/* HERO */
+.hero{min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;position:relative;overflow:hidden;padding:60px 24px}
+.hero::before{content:'';position:absolute;top:-30%;left:-20%;width:140%;height:160%;background:radial-gradient(ellipse at 30% 50%,rgba(255,107,53,.06),transparent 50%),radial-gradient(ellipse at 70% 50%,rgba(74,144,217,.06),transparent 50%);animation:drift 20s ease-in-out infinite alternate;pointer-events:none}
+@keyframes drift{0%{transform:translate(0,0) scale(1)}100%{transform:translate(40px,-30px) scale(1.05)}}
+.hero-badge{display:inline-block;padding:6px 16px;border-radius:100px;border:1px solid var(--border);background:var(--surface);font-size:11px;letter-spacing:3px;color:var(--muted);margin-bottom:24px;text-transform:uppercase}
+.hero-badge span{color:var(--accent);font-weight:700}
+.hero h1{font-family:'Playfair Display',serif;font-size:clamp(40px,7vw,80px);font-weight:900;letter-spacing:-2px;line-height:1;margin-bottom:16px}
+.hero h1 .gradient{background:linear-gradient(135deg,#FF6B35,#F7C948,#4A90D9,#8EC5FC);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero p{font-size:clamp(16px,2vw,20px);color:var(--muted);max-width:600px;margin:0 auto 32px;line-height:1.7}
+.hero-cta{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+.btn{padding:14px 32px;border-radius:10px;font-size:15px;font-weight:700;font-family:'DM Sans';cursor:pointer;border:none;transition:all .3s}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#E85D2C);color:#fff;box-shadow:0 4px 24px rgba(255,107,53,.3)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(255,107,53,.4)}
+.btn-secondary{background:var(--surface);color:var(--fg);border:1px solid var(--border)}
+.btn-secondary:hover{border-color:rgba(255,255,255,.15);background:rgba(255,255,255,.06)}
+.hero-stats{display:flex;gap:40px;margin-top:48px;flex-wrap:wrap;justify-content:center}
+.hero-stat{text-align:center}
+.hero-stat .num{font-size:28px;font-weight:900;font-family:'Playfair Display',serif}
+.hero-stat .label{font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-top:2px}
+
+/* FEATURES */
+.section{padding:100px 24px}
+.section-label{font-size:11px;letter-spacing:4px;color:var(--accent);text-transform:uppercase;margin-bottom:12px}
+.section h2{font-family:'Playfair Display',serif;font-size:clamp(28px,4vw,44px);font-weight:900;letter-spacing:-1px;margin-bottom:16px}
+.section p.subtitle{font-size:17px;color:var(--muted);max-width:600px;line-height:1.7;margin-bottom:48px}
+
+.features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+.feature-card{padding:28px 24px;border-radius:14px;background:var(--surface);border:1px solid var(--border);transition:all .3s}
+.feature-card:hover{border-color:rgba(255,255,255,.12);transform:translateY(-4px);box-shadow:0 12px 40px rgba(0,0,0,.3)}
+.feature-icon{font-size:32px;margin-bottom:12px}
+.feature-card h3{font-size:17px;font-weight:700;margin-bottom:6px}
+.feature-card p{font-size:13px;color:var(--muted);line-height:1.6}
+.feature-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:1px;margin-left:6px}
+.badge-free{background:rgba(74,144,217,.15);color:#4A90D9}
+.badge-pro{background:rgba(247,201,72,.15);color:#F7C948}
+
+/* CITIES */
+.cities-scroll{display:flex;gap:12px;overflow-x:auto;padding:16px 0;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.cities-scroll::-webkit-scrollbar{display:none}
+.city-pill{flex-shrink:0;padding:10px 18px;border-radius:10px;background:var(--surface);border:1px solid var(--border);font-size:13px;display:flex;align-items:center;gap:8px;white-space:nowrap}
+.city-pill .flag{font-size:18px}
+
+/* PRICING */
+.pricing-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:700px;margin:0 auto}
+@media(max-width:600px){.pricing-grid{grid-template-columns:1fr}}
+.pricing-card{padding:32px 24px;border-radius:14px;background:var(--surface);border:1px solid var(--border)}
+.pricing-card.pro{border-color:rgba(247,201,72,.3);background:linear-gradient(135deg,rgba(247,201,72,.04),rgba(255,107,53,.04))}
+.pricing-card h3{font-size:20px;font-weight:900;margin-bottom:4px}
+.pricing-card .price{font-size:32px;font-weight:900;font-family:'Playfair Display',serif;margin:12px 0}
+.pricing-card .price span{font-size:14px;color:var(--muted);font-weight:400}
+.pricing-card ul{list-style:none;padding:0;margin:16px 0}
+.pricing-card li{padding:6px 0;font-size:13px;color:var(--muted)}
+.pricing-card li::before{content:'✓';color:var(--accent2);margin-right:8px;font-weight:700}
+.pricing-card.pro li::before{color:var(--accent3)}
+
+/* CTA */
+.cta-section{text-align:center;padding:100px 24px;position:relative;overflow:hidden}
+.cta-section::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(255,107,53,.05),transparent 60%);pointer-events:none}
+.email-form{display:flex;gap:8px;max-width:440px;margin:24px auto 0;flex-wrap:wrap;justify-content:center}
+.email-form input{flex:1;min-width:200px;padding:14px 18px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--fg);font-size:14px;font-family:'DM Sans';outline:none}
+.email-form input::placeholder{color:rgba(255,255,255,.2)}
+.email-form input:focus{border-color:var(--accent)}
+
+/* FOOTER */
+footer{padding:40px 24px;border-top:1px solid var(--border);text-align:center}
+footer p{font-size:11px;color:var(--muted);letter-spacing:1px}
+footer a{color:var(--accent)}
+
+/* ANIMATIONS */
+.fade-up{opacity:0;transform:translateY(30px);transition:all .8s cubic-bezier(.16,1,.3,1)}
+.fade-up.visible{opacity:1;transform:translateY(0)}
+
+/* HEARTBEAT ANIMATION (pure CSS) */
+.heartbeat-demo{display:flex;justify-content:center;gap:40px;margin:40px 0;flex-wrap:wrap}
+.hb-city{text-align:center;padding:20px 30px;border-radius:12px;background:var(--surface);border:1px solid var(--border);min-width:200px}
+.hb-line{height:40px;position:relative;overflow:hidden}
+.hb-line svg{width:200px;height:40px}
+.hb-line path{stroke-dasharray:600;animation:pulse-draw 2s linear infinite}
+@keyframes pulse-draw{0%{stroke-dashoffset:600}100%{stroke-dashoffset:0}}
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">🔴 Live Now — <span>40+ Cities</span> Connected</div>
+  <h1><span class="gradient">LivePulse</span></h1>
+  <p>The world's first city consciousness engine. Feel a city's heartbeat, mood, and soul — before you ever set foot there.</p>
+  <div class="hero-cta">
+    <a href="#" class="btn btn-primary">Launch App →</a>
+    <a href="https://github.com/tahseen137/LivePulse" class="btn btn-secondary">⭐ Star on GitHub</a>
+  </div>
+  <div class="hero-stats">
+    <div class="hero-stat"><div class="num" style="color:var(--accent)">40+</div><div class="label">Cities</div></div>
+    <div class="hero-stat"><div class="num" style="color:var(--accent2)">6</div><div class="label">Continents</div></div>
+    <div class="hero-stat"><div class="num" style="color:var(--accent3)">∞</div><div class="label">City Pairs</div></div>
+    <div class="hero-stat"><div class="num" style="color:#8EC5FC">AI</div><div class="label">Oracle</div></div>
+  </div>
+</section>
+
+<!-- WHAT IS IT -->
+<section class="section" style="text-align:center">
+  <div class="container">
+    <div class="section-label">What Is LivePulse</div>
+    <h2>Cities are not spreadsheets.<br>They're living organisms.</h2>
+    <p class="subtitle" style="margin:16px auto 48px">Every city comparison tool gives you data tables. LivePulse gives you consciousness — heartbeats, moods, and an AI that understands cities the way locals do.</p>
+
+    <div class="heartbeat-demo">
+      <div class="hb-city">
+        <div style="font-size:20px;margin-bottom:4px">🇧🇩</div>
+        <div style="font-weight:700;font-size:15px">Dhaka</div>
+        <div style="font-size:11px;color:var(--muted)">92 BPM — Electrified</div>
+        <div class="hb-line">
+          <svg viewBox="0 0 200 40"><path d="M0 20 L60 20 L70 5 L80 35 L90 20 L200 20" fill="none" stroke="#FF6B35" stroke-width="2"/></svg>
+        </div>
+      </div>
+      <div class="hb-city">
+        <div style="font-size:20px;margin-bottom:4px">🇨🇦</div>
+        <div style="font-weight:700;font-size:15px">Toronto</div>
+        <div style="font-size:11px;color:var(--muted)">64 BPM — Contemplative</div>
+        <div class="hb-line">
+          <svg viewBox="0 0 200 40"><path d="M0 20 L80 20 L90 8 L100 32 L110 20 L200 20" fill="none" stroke="#4A90D9" stroke-width="2"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="section">
+  <div class="container">
+    <div class="section-label">Features</div>
+    <h2>Everything a city can tell you</h2>
+    <p class="subtitle">More than data. LivePulse synthesizes weather, population, news, sports, and urban rhythm into a living portrait.</p>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🫀</div>
+        <h3>City Heartbeat <span class="feature-badge badge-free">FREE</span></h3>
+        <p>Animated ECG lines derived from density, traffic, and urban energy. See a city's nervous system in real-time.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🌊</div>
+        <h3>Emotional Weather <span class="feature-badge badge-free">FREE</span></h3>
+        <p>Beyond temperature — is the city Electrified, Contemplative, Restless, or Dreaming? Computed from time, density, and rhythm.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔮</div>
+        <h3>AI Oracle <span class="feature-badge badge-free">5/DAY</span></h3>
+        <p>Ask anything about any two cities. "Which is safer?" "Best food under $5?" Poetic, data-backed answers instantly.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⏳</div>
+        <h3>Time Bridge <span class="feature-badge badge-free">FREE</span></h3>
+        <p>See what life looks like in both cities right now. Dawn in Dhaka while Toronto sleeps. Real-time, always synced.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚔️</div>
+        <h3>City Duel <span class="feature-badge badge-free">FREE</span></h3>
+        <p>Head-to-head comparison with visual bar charts. Population, density, energy — who wins today?</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3>Livability Radar <span class="feature-badge badge-pro">PRO</span></h3>
+        <p>8-dimension scoring: safety, transit, food, culture, nightlife, nature, cost, health. Radar overlay for comparison.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🌬️</div>
+        <h3>Air Quality Tracking <span class="feature-badge badge-pro">PRO</span></h3>
+        <p>Real-time AQI with visual gauges. Historical trends. Know if you need a mask before you pack.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">💰</div>
+        <h3>Cost of Living <span class="feature-badge badge-pro">PRO</span></h3>
+        <p>Meals, rent, transit, internet, beer — side by side with green highlighting for the cheaper option.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🗣️</div>
+        <h3>Language Phrasebook <span class="feature-badge badge-pro">PRO</span></h3>
+        <p>Essential phrases for every city. Speak like a local from day one. Romanized pronunciation included.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CITIES -->
+<section class="section" style="text-align:center">
+  <div class="container">
+    <div class="section-label">Global Coverage</div>
+    <h2>40+ cities across 6 continents</h2>
+    <p class="subtitle" style="margin:16px auto 32px">From megacities to digital nomad hotspots. Every city is a consciousness waiting to be explored.</p>
+    <div class="cities-scroll">
+      <div class="city-pill"><span class="flag">🇧🇩</span>Dhaka</div>
+      <div class="city-pill"><span class="flag">🇯🇵</span>Tokyo</div>
+      <div class="city-pill"><span class="flag">🇬🇧</span>London</div>
+      <div class="city-pill"><span class="flag">🇺🇸</span>New York</div>
+      <div class="city-pill"><span class="flag">🇦🇪</span>Dubai</div>
+      <div class="city-pill"><span class="flag">🇸🇬</span>Singapore</div>
+      <div class="city-pill"><span class="flag">🇮🇳</span>Mumbai</div>
+      <div class="city-pill"><span class="flag">🇹🇷</span>Istanbul</div>
+      <div class="city-pill"><span class="flag">🇰🇷</span>Seoul</div>
+      <div class="city-pill"><span class="flag">🇹🇭</span>Bangkok</div>
+      <div class="city-pill"><span class="flag">🇫🇷</span>Paris</div>
+      <div class="city-pill"><span class="flag">🇩🇪</span>Berlin</div>
+      <div class="city-pill"><span class="flag">🇦🇺</span>Sydney</div>
+      <div class="city-pill"><span class="flag">🇳🇬</span>Lagos</div>
+      <div class="city-pill"><span class="flag">🇧🇷</span>São Paulo</div>
+      <div class="city-pill"><span class="flag">🇨🇦</span>Toronto</div>
+      <div class="city-pill"><span class="flag">🇵🇹</span>Lisbon</div>
+      <div class="city-pill"><span class="flag">🇰🇪</span>Nairobi</div>
+      <div class="city-pill"><span class="flag">🇵🇭</span>Manila</div>
+      <div class="city-pill"><span class="flag">🇨🇳</span>Beijing</div>
+      <div class="city-pill"><span class="flag">🇵🇪</span>Lima</div>
+      <div class="city-pill"><span class="flag">🇻🇳</span>Hanoi</div>
+      <div class="city-pill"><span class="flag">🇦🇹</span>Vienna</div>
+      <div class="city-pill"><span class="flag">🇳🇱</span>Amsterdam</div>
+      <div class="city-pill" style="color:var(--accent3)">+ more coming</div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="section" style="text-align:center">
+  <div class="container">
+    <div class="section-label">Pricing</div>
+    <h2>Start free. Go deeper with Pro.</h2>
+    <p class="subtitle" style="margin:16px auto 48px">Everything you need to feel a city is free. Pro unlocks the full intelligence layer.</p>
+    <div class="pricing-grid">
+      <div class="pricing-card">
+        <h3>Free</h3>
+        <div style="font-size:12px;color:var(--muted)">For curious explorers</div>
+        <div class="price">$0</div>
+        <ul>
+          <li>2-city comparison</li>
+          <li>Real-time heartbeats & clocks</li>
+          <li>Emotional weather</li>
+          <li>Time bridge</li>
+          <li>City duel</li>
+          <li>5 Oracle queries / day</li>
+        </ul>
+        <a href="#" class="btn btn-secondary" style="width:100%;display:block;text-align:center">Launch Free →</a>
+      </div>
+      <div class="pricing-card pro">
+        <h3 style="color:var(--accent3)">⭐ Pro</h3>
+        <div style="font-size:12px;color:var(--muted)">For nomads & relocators</div>
+        <div class="price" style="color:var(--accent3)">$5<span>/month</span></div>
+        <ul>
+          <li>Everything in Free</li>
+          <li>40+ city multi-comparison</li>
+          <li>Cost of living data</li>
+          <li>Air quality tracking</li>
+          <li>Livability radar charts</li>
+          <li>Language phrasebooks</li>
+          <li>Unlimited Oracle queries</li>
+          <li>Historical trends</li>
+          <li>API access</li>
+        </ul>
+        <a href="#" class="btn btn-primary" style="width:100%;display:block;text-align:center">Coming Soon — Waitlist</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="container" style="position:relative;z-index:1">
+    <h2 style="font-family:'Playfair Display',serif;font-size:clamp(28px,4vw,40px);font-weight:900;margin-bottom:8px">Feel a city before you go.</h2>
+    <p style="color:var(--muted);font-size:16px;margin-bottom:24px">Join the waitlist for Pro and get early access to every new city.</p>
+    <div class="email-form">
+      <input type="email" placeholder="your@email.com">
+      <button class="btn btn-primary">Join Waitlist</button>
+    </div>
+    <p style="font-size:11px;color:var(--muted);margin-top:12px;opacity:.5">No spam. Just city consciousness.</p>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <p>
+    <a href="https://github.com/tahseen137/LivePulse">GitHub</a> · 
+    <a href="https://www.producthunt.com/@tahseen_rahman">Product Hunt</a> · 
+    Built by <a href="https://github.com/tahseen137">Tahseen</a> with <a href="https://claude.ai">Claude</a>
+  </p>
+  <p style="margin-top:8px;opacity:.3">© 2026 LivePulse. Two cities. Two souls. One moment in time.</p>
+</footer>
+
+<script>
+// Fade-in on scroll
+const obs = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible') });
+}, { threshold: 0.1 });
+document.querySelectorAll('.feature-card, .pricing-card, .hb-city').forEach(el => {
+  el.classList.add('fade-up');
+  obs.observe(el);
+});
+</script>
+</body>
+</html>
