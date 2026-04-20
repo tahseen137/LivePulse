@@ -454,34 +454,44 @@ function TimeBridge({ city1, city2 }) {
   );
 }
 
-function OracleChat({ city1, city2 }) {
+function OracleChat({ city1, city2, isPro, onUpgrade }) {
   const pairKey = `livepulse_oracle_${[city1.id, city2.id].sort().join("_")}`;
   const [q, setQ] = useState("");
   const [ans, setAns] = useState("");
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState(() => LS.get(pairKey, []));
+  const [remaining, setRemaining] = useState(null); // null = unknown (pro or first visit)
+  const [rateLimited, setRateLimited] = useState(false);
+
+  const DAILY_FREE_LIMIT = 5;
 
   useEffect(() => {
     setHistory(LS.get(pairKey, []));
-    setAns("");
+    setAns(""); setRateLimited(false);
   }, [pairKey]);
 
   const ask = async () => {
-    if (!q.trim() || loading) return;
-    setLoading(true); setAns("");
+    if (!q.trim() || loading || rateLimited) return;
+    setLoading(true); setAns(""); setRateLimited(false);
     const question = q; setQ("");
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+      const res = await fetch("/api/oracle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514", max_tokens: 1000,
-          messages: [{ role: "user", content: `You are "The Oracle" of LivePulse — an AI with deep awareness of cities. Today: ${new Date().toLocaleDateString()}.
-City 1: ${city1.name}, ${city1.country}. Pop: ${city1.pop}. Density: ${city1.density}. Currency: ${city1.currency}. Language: ${city1.lang}. TZ: ${city1.tz}.
-City 2: ${city2.name}, ${city2.country}. Pop: ${city2.pop}. Density: ${city2.density}. Currency: ${city2.currency}. Language: ${city2.lang}. TZ: ${city2.tz}.
-Answer poetically but with specific data in 2-4 sentences: "${question}"` }],
+          question,
+          city1: { name: city1.name, country: city1.country, pop: city1.pop, density: city1.density, currency: city1.currency, lang: city1.lang, tz: city1.tz },
+          city2: { name: city2.name, country: city2.country, pop: city2.pop, density: city2.density, currency: city2.currency, lang: city2.lang, tz: city2.tz },
         }),
       });
+      if (res.status === 429) {
+        setRateLimited(true);
+        setRemaining(0);
+        setLoading(false);
+        return;
+      }
       const data = await res.json();
+      if (data._remaining !== undefined && data._remaining !== null) setRemaining(data._remaining);
       const text = data.content?.map(c => c.text || "").join("") || "The Oracle meditates...";
       setAns(text);
       setHistory(h => {
@@ -498,6 +508,7 @@ Answer poetically but with specific data in 2-4 sentences: "${question}"` }],
     LS.set(pairKey, []);
     setAns("");
   };
+
 
   return (
     <div style={{ maxWidth: "680px", margin: "0 auto" }}>
@@ -519,18 +530,33 @@ Answer poetically but with specific data in 2-4 sentences: "${question}"` }],
       ))}
       <div style={{ display: "flex", gap: "6px" }}>
         <input type="text" value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === "Enter" && ask()}
-          placeholder={`Ask about ${city1.name} or ${city2.name}...`}
-          style={{ flex: 1, padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(255,255,255,.08)", background: "rgba(255,255,255,.03)", color: "#fff", fontSize: "13px", outline: "none", fontFamily: "'DM Sans'" }} />
-        <button onClick={ask} disabled={loading} style={{ padding: "10px 18px", borderRadius: "8px", border: "none", background: `linear-gradient(135deg, ${city1.accent}, ${city2.accent})`, color: "#fff", fontWeight: 700, cursor: loading ? "wait" : "pointer", fontSize: "13px", fontFamily: "'DM Sans'", opacity: loading ? .5 : 1 }}>
+          placeholder={rateLimited ? "Daily limit reached — upgrade to continue" : `Ask about ${city1.name} or ${city2.name}...`}
+          disabled={rateLimited}
+          style={{ flex: 1, padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(255,255,255,.08)", background: rateLimited ? "rgba(255,255,255,.01)" : "rgba(255,255,255,.03)", color: "#fff", fontSize: "13px", outline: "none", fontFamily: "'DM Sans'", opacity: rateLimited ? .5 : 1 }} />
+        <button onClick={ask} disabled={loading || rateLimited} style={{ padding: "10px 18px", borderRadius: "8px", border: "none", background: `linear-gradient(135deg, ${city1.accent}, ${city2.accent})`, color: "#fff", fontWeight: 700, cursor: (loading || rateLimited) ? "not-allowed" : "pointer", fontSize: "13px", fontFamily: "'DM Sans'", opacity: (loading || rateLimited) ? .4 : 1 }}>
           {loading ? "⏳" : "Ask"}
         </button>
       </div>
+      {!isPro && remaining !== null && !rateLimited && (
+        <div style={{ fontSize: "9px", opacity: .3, textAlign: "center", marginTop: "5px" }}>
+          {remaining} of {DAILY_FREE_LIMIT} free queries remaining today
+        </div>
+      )}
+      {rateLimited && (
+        <div style={{ marginTop: "14px", padding: "16px", borderRadius: "10px", background: "rgba(247,201,72,.06)", border: "1px solid rgba(247,201,72,.2)", textAlign: "center" }}>
+          <div style={{ fontSize: "13px", fontWeight: 700, color: "#F7C948", marginBottom: "4px" }}>Daily limit reached</div>
+          <div style={{ fontSize: "10px", opacity: .5, marginBottom: "12px" }}>You've used all {DAILY_FREE_LIMIT} free Oracle queries for today. Resets at midnight.</div>
+          <button onClick={onUpgrade} style={{ padding: "8px 20px", borderRadius: "8px", border: "none", background: "linear-gradient(135deg, #F7C948, #FF6B35)", color: "#000", fontWeight: 700, fontSize: "12px", cursor: "pointer", fontFamily: "'DM Sans'" }}>
+            ⭐ Upgrade to Pro — Unlimited Queries
+          </button>
+        </div>
+      )}
       {ans && !history.find(h => h.a === ans) && (
         <div style={{ marginTop: "8px", padding: "12px", borderRadius: "8px", background: `linear-gradient(135deg, ${city1.accent}08, ${city2.accent}08)`, borderLeft: "3px solid rgba(255,255,255,.1)", fontStyle: "italic", fontSize: "13px", lineHeight: 1.6, fontFamily: "'Playfair Display',serif" }}>{ans}</div>
       )}
       <div style={{ marginTop: "10px", display: "flex", gap: "4px", flexWrap: "wrap", justifyContent: "center" }}>
         {["Which is safer?", "Best food?", "Cost comparison?", "Better for remote work?", "Which never sleeps?"].map(s => (
-          <button key={s} onClick={() => setQ(s)} style={{ padding: "4px 10px", borderRadius: "16px", border: "1px solid rgba(255,255,255,.05)", background: "rgba(255,255,255,.02)", color: "#555", fontSize: "9px", cursor: "pointer", fontFamily: "'DM Sans'" }}>{s}</button>
+          <button key={s} onClick={() => !rateLimited && setQ(s)} style={{ padding: "4px 10px", borderRadius: "16px", border: "1px solid rgba(255,255,255,.05)", background: "rgba(255,255,255,.02)", color: rateLimited ? "#333" : "#555", fontSize: "9px", cursor: rateLimited ? "default" : "pointer", fontFamily: "'DM Sans'" }}>{s}</button>
         ))}
       </div>
     </div>
@@ -686,6 +712,46 @@ export default function LivePulse() {
   const [showShare, setShowShare] = useState(false);
   const [favorites, setFavorites] = useState(() => LS.get("livepulse_favorites", []));
   const [recents, setRecents] = useState(() => LS.get("livepulse_recents", []));
+  const [isPro, setIsPro] = useState(() => localStorage.getItem("lp_pro") === "true");
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [proActivated, setProActivated] = useState(false);
+
+  // After Stripe redirects back with ?pro_session=<id>, verify and activate Pro
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const proSession = params.get("pro_session");
+    if (!proSession) return;
+    // Clean the URL immediately so a refresh doesn't re-verify
+    window.history.replaceState({}, "", "/");
+    fetch(`/api/pro-callback?session_id=${encodeURIComponent(proSession)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.isPro) {
+          setIsPro(true);
+          localStorage.setItem("lp_pro", "true");
+          setProActivated(true);
+          setShowPro(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleCheckout = async () => {
+    setCheckoutLoading(true);
+    try {
+      const res = await fetch("/api/checkout", { method: "POST" });
+      const { url, error } = await res.json();
+      if (url) {
+        window.location.href = url;
+      } else {
+        alert(error || "Could not start checkout. Please try again.");
+        setCheckoutLoading(false);
+      }
+    } catch {
+      alert("Could not connect to checkout. Please try again.");
+      setCheckoutLoading(false);
+    }
+  };
 
   const city1 = CITY_DB.find(c => c.id === city1Id);
   const city2 = CITY_DB.find(c => c.id === city2Id);
@@ -853,7 +919,10 @@ export default function LivePulse() {
           <div style={{ textAlign: "center", marginBottom: "12px" }}>
             <div style={{ fontSize: "24px" }}>⭐</div>
             <div style={{ fontSize: "18px", fontWeight: 900, fontFamily: "'Playfair Display',serif", color: "#F7C948" }}>LivePulse Pro</div>
-            <div style={{ fontSize: "10px", opacity: .4 }}>Unlock the full city consciousness experience</div>
+            {proActivated
+              ? <div style={{ fontSize: "11px", color: "#7FFF9A", marginTop: "4px" }}>Pro activated — welcome aboard!</div>
+              : <div style={{ fontSize: "10px", opacity: .4 }}>Unlock the full city consciousness experience</div>
+            }
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
             <div>
@@ -865,9 +934,15 @@ export default function LivePulse() {
               {PRO_FEATURES.map(f => <div key={f} style={{ fontSize: "10px", color: "#F7C948", padding: "2px 0" }}>⭐ {f}</div>)}
             </div>
           </div>
-          <button style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "none", background: "linear-gradient(135deg, #F7C948, #FF6B35)", color: "#000", fontWeight: 700, fontSize: "13px", cursor: "pointer", fontFamily: "'DM Sans'" }}>
-            Coming Soon — Join Waitlist
-          </button>
+          {isPro ? (
+            <div style={{ textAlign: "center", padding: "10px", borderRadius: "8px", background: "rgba(127,255,154,.08)", border: "1px solid rgba(127,255,154,.2)", fontSize: "12px", color: "#7FFF9A", fontWeight: 700 }}>
+              You're on Pro — unlimited Oracle queries active
+            </div>
+          ) : (
+            <button onClick={handleCheckout} disabled={checkoutLoading} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "none", background: "linear-gradient(135deg, #F7C948, #FF6B35)", color: "#000", fontWeight: 700, fontSize: "13px", cursor: checkoutLoading ? "wait" : "pointer", fontFamily: "'DM Sans'", opacity: checkoutLoading ? .7 : 1 }}>
+              {checkoutLoading ? "Redirecting to Stripe..." : "Get Pro — $5/mo"}
+            </button>
+          )}
           <button onClick={() => setShowPro(false)} style={{ width: "100%", padding: "6px", border: "none", background: "none", color: "#666", fontSize: "10px", cursor: "pointer", marginTop: "6px", fontFamily: "'DM Sans'" }}>Close</button>
         </div>
       )}
@@ -888,7 +963,7 @@ export default function LivePulse() {
         )}
         {tab === "timeline" && <div style={{ animation: "slideUp .4s ease-out" }}><TimelineView city1={city1} city2={city2} /></div>}
         {tab === "duel" && <div style={{ animation: "slideUp .4s ease-out" }}><DuelView city1={city1} city2={city2} /></div>}
-        {tab === "oracle" && <div style={{ animation: "slideUp .4s ease-out" }}><OracleChat city1={city1} city2={city2} /></div>}
+        {tab === "oracle" && <div style={{ animation: "slideUp .4s ease-out" }}><OracleChat city1={city1} city2={city2} isPro={isPro} onUpgrade={() => setShowPro(true)} /></div>}
       </div>
 
       {/* FOOTER */}
