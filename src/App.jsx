@@ -360,18 +360,121 @@ function DuelView({ city1, city2 }) {
 }
 
 // ══════════════════════════════════════════════════════════
+// SHARE CARD
+// ══════════════════════════════════════════════════════════
+function ShareCard({ city1, city2, url, onClose }) {
+  const [copied, setCopied] = useState(false);
+  const [, setTick] = useState(0);
+  useEffect(() => { const iv = setInterval(() => setTick(t => t + 1), 1000); return () => clearInterval(iv); }, []);
+
+  const t1 = getCityTime(city1.utc), t2 = getCityTime(city2.utc);
+  const mood1 = getMood(t1.getHours(), city1.density);
+  const mood2 = getMood(t2.getHours(), city2.density);
+  const bpm1 = useMemo(() => getHeartRate(city1), [city1.id]);
+  const bpm2 = useMemo(() => getHeartRate(city2), [city2.id]);
+  const time1 = t1.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+  const time2 = t2.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+
+  const handleCopy = async () => {
+    try { await navigator.clipboard.writeText(url); } catch { /* fallback: select */ }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleNativeShare = () => navigator.share({
+    title: `${city1.name} vs ${city2.name} — LivePulse`,
+    text: `${city1.name} is ${mood1} · ${city2.name} is ${mood2}. Feel both cities now:`,
+    url,
+  });
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.75)", backdropFilter: "blur(6px)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px", animation: "fadeIn .2s" }}>
+      <div onClick={e => e.stopPropagation()} style={{ maxWidth: "460px", width: "100%", borderRadius: "16px", background: "#0e0e0e", border: "1px solid rgba(255,255,255,.1)", overflow: "hidden", animation: "slideUp .25s ease-out" }}>
+
+        {/* Preview */}
+        <div style={{ padding: "22px 20px 18px", background: `linear-gradient(135deg, ${city1.accent}14 0%, #0e0e0e 45%, ${city2.accent}14 100%)`, borderBottom: "1px solid rgba(255,255,255,.06)" }}>
+          <div style={{ fontSize: "7px", letterSpacing: "4px", opacity: .25, textAlign: "center", marginBottom: "14px" }}>LIVEPULSE · CITY CONSCIOUSNESS</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: "10px", alignItems: "center" }}>
+            {[{ city: city1, mood: mood1, bpm: bpm1, time: time1 }, null, { city: city2, mood: mood2, bpm: bpm2, time: time2 }].map((item, i) =>
+              item === null
+                ? <div key="vs" style={{ textAlign: "center", opacity: .15 }}><div style={{ fontSize: "10px", letterSpacing: "3px" }}>VS</div></div>
+                : <div key={i} style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: "30px" }}>{item.city.flag}</div>
+                    <div style={{ fontSize: "15px", fontWeight: 900, fontFamily: "'Playfair Display',serif", color: item.city.accent, marginTop: "4px" }}>{item.city.name}</div>
+                    <div style={{ fontSize: "8px", opacity: .35, marginBottom: "8px" }}>{item.city.country}</div>
+                    <div style={{ padding: "7px 4px", borderRadius: "8px", background: `${item.city.accent}12`, border: `1px solid ${item.city.accent}20` }}>
+                      <div style={{ fontSize: "12px", fontWeight: 800, color: item.city.accent, fontFamily: "'Playfair Display',serif" }}>{item.mood}</div>
+                      <div style={{ fontSize: "8px", opacity: .45, marginTop: "3px" }}>{item.bpm} BPM</div>
+                      <div style={{ fontSize: "8px", opacity: .45 }}>{item.time}</div>
+                    </div>
+                  </div>
+            )}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div style={{ padding: "14px 16px" }}>
+          <div style={{ fontSize: "9px", opacity: .25, padding: "6px 10px", borderRadius: "6px", background: "rgba(255,255,255,.03)", fontFamily: "'JetBrains Mono',monospace", wordBreak: "break-all", marginBottom: "10px" }}>{url}</div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button onClick={handleCopy} style={{ flex: 1, padding: "10px", borderRadius: "8px", border: `1px solid ${copied ? "rgba(100,220,100,.3)" : "rgba(255,255,255,.1)"}`, background: copied ? "rgba(100,220,100,.08)" : "rgba(255,255,255,.04)", color: copied ? "#7de87d" : "#ccc", fontSize: "12px", cursor: "pointer", fontFamily: "'DM Sans'", fontWeight: 700, transition: "all .2s" }}>
+              {copied ? "✓ Copied!" : "Copy Link"}
+            </button>
+            {typeof navigator !== "undefined" && navigator.share && (
+              <button onClick={handleNativeShare} style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "none", background: `linear-gradient(135deg, ${city1.accent}, ${city2.accent})`, color: "#fff", fontSize: "12px", cursor: "pointer", fontFamily: "'DM Sans'", fontWeight: 700 }}>
+                Share ↗
+              </button>
+            )}
+          </div>
+          <button onClick={onClose} style={{ width: "100%", padding: "6px", border: "none", background: "none", color: "#555", fontSize: "10px", cursor: "pointer", marginTop: "6px", fontFamily: "'DM Sans'" }}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
 // MAIN APP
 // ══════════════════════════════════════════════════════════
 export default function LivePulse() {
-  const [city1Id, setCity1Id] = useState("dhaka");
-  const [city2Id, setCity2Id] = useState("toronto");
+  const [city1Id, setCity1Id] = useState(() => {
+    const p = new URLSearchParams(window.location.search);
+    const c1 = p.get("c1");
+    return CITY_DB.some(c => c.id === c1) ? c1 : "dhaka";
+  });
+  const [city2Id, setCity2Id] = useState(() => {
+    const p = new URLSearchParams(window.location.search);
+    const c2 = p.get("c2");
+    return CITY_DB.some(c => c.id === c2) ? c2 : "toronto";
+  });
   const [tab, setTab] = useState("pulse");
   const [search, setSearch] = useState("");
   const [selecting, setSelecting] = useState(null); // null | 1 | 2
   const [showPro, setShowPro] = useState(false);
+  const [showShare, setShowShare] = useState(false);
 
   const city1 = CITY_DB.find(c => c.id === city1Id);
   const city2 = CITY_DB.find(c => c.id === city2Id);
+
+  // Sync URL and meta tags whenever cities change
+  useEffect(() => {
+    const params = new URLSearchParams();
+    params.set("c1", city1Id);
+    params.set("c2", city2Id);
+    window.history.replaceState(null, "", `?${params.toString()}`);
+
+    const title = `${city1.name} vs ${city2.name} — LivePulse`;
+    document.title = title;
+    const setMeta = (sel, attr, val) => { const el = document.querySelector(sel); if (el) el.setAttribute(attr, val); };
+    setMeta('meta[property="og:title"]', "content", title);
+    setMeta('meta[name="twitter:title"]', "content", title);
+    const desc = `${city1.name} is ${getMood(getCityTime(city1.utc).getHours(), city1.density)} · ${city2.name} is ${getMood(getCityTime(city2.utc).getHours(), city2.density)}. Feel both cities on LivePulse.`;
+    setMeta('meta[property="og:description"]', "content", desc);
+    setMeta('meta[name="twitter:description"]', "content", desc);
+    const shareUrl = `${window.location.origin}${window.location.pathname}?c1=${city1Id}&c2=${city2Id}`;
+    setMeta('meta[property="og:url"]', "content", shareUrl);
+  }, [city1Id, city2Id]);
+
+  const shareUrl = `${window.location.origin}${window.location.pathname}?c1=${city1Id}&c2=${city2Id}`;
 
   const filtered = useMemo(() => {
     if (!search) return CITY_DB;
@@ -430,6 +533,10 @@ export default function LivePulse() {
         }}>
           {city2.flag} {city2.name}
         </button>
+        <button onClick={() => setShowShare(true)} title="Share this comparison" style={{
+          padding: "8px 12px", borderRadius: "8px", cursor: "pointer", fontFamily: "'DM Sans'", fontSize: "13px",
+          border: "2px solid rgba(255,255,255,.1)", background: "rgba(255,255,255,.04)", color: "#aaa",
+        }}>🔗</button>
       </div>
 
       {/* CITY PICKER DROPDOWN */}
@@ -485,6 +592,9 @@ export default function LivePulse() {
           <button onClick={() => setShowPro(false)} style={{ width: "100%", padding: "6px", border: "none", background: "none", color: "#666", fontSize: "10px", cursor: "pointer", marginTop: "6px", fontFamily: "'DM Sans'" }}>Close</button>
         </div>
       )}
+
+      {/* SHARE CARD */}
+      {showShare && <ShareCard city1={city1} city2={city2} url={shareUrl} onClose={() => setShowShare(false)} />}
 
       {/* CONTENT */}
       <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 10px 30px" }}>
