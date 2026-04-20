@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 
 // ══════════════════════════════════════════════════════════
 // CITY DATABASE — 50+ global cities with real data
@@ -74,9 +74,181 @@ function getMood(h, density) {
   return d > 10000 ? "Vibrant" : "Relaxed";
 }
 
+function getHourlyBPM(city, hour) {
+  const d = parseFloat(city.density.replace(/[^0-9.]/g, ""));
+  const base = Math.round(40 + d / 1000 + 5);
+  // Peak ~9–11am, trough ~3am — smooth sine curve
+  const delta = Math.round(10 * Math.sin(((hour - 3) / 24) * 2 * Math.PI));
+  return Math.min(120, Math.max(50, base + delta));
+}
+
+function getMoodColor(mood) {
+  const map = { Dreaming: "#4A90D9", Restless: "#E63946", Awakening: "#F7C948", Surging: "#FF6B35", Contemplative: "#8EC5FC", Focused: "#4A90D9", Electrified: "#FF6B35", Vibrant: "#F7C948", Relaxed: "#8EC5FC" };
+  return map[mood] || "#888";
+}
+
+// ══════════════════════════════════════════════════════════
+// HOOKS
+// ══════════════════════════════════════════════════════════
+
+function useHeartbeatSound(audioCtx, bpm, enabled) {
+  const ivRef = useRef(null);
+
+  useEffect(() => {
+    clearInterval(ivRef.current);
+    if (!enabled || !audioCtx) return;
+
+    const playBeat = () => {
+      const now = audioCtx.currentTime;
+      const thump = (freq, t, dur, vol) => {
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.connect(g);
+        g.connect(audioCtx.destination);
+        o.type = "sine";
+        o.frequency.setValueAtTime(freq, t);
+        o.frequency.exponentialRampToValueAtTime(freq * 0.5, t + dur);
+        g.gain.setValueAtTime(vol, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+        o.start(t);
+        o.stop(t + dur + 0.05);
+      };
+      thump(80, now, 0.12, 0.25);       // lub
+      thump(60, now + 0.15, 0.10, 0.15); // dub
+    };
+
+    playBeat();
+    ivRef.current = setInterval(playBeat, (60 / bpm) * 1000);
+    return () => clearInterval(ivRef.current);
+  }, [audioCtx, bpm, enabled]);
+
+  // Cleanup on unmount
+  useEffect(() => () => clearInterval(ivRef.current), []);
+}
+
 // ══════════════════════════════════════════════════════════
 // COMPONENTS
 // ══════════════════════════════════════════════════════════
+
+function MoodTimeline({ city }) {
+  const [, setTick] = useState(0);
+  useEffect(() => { const iv = setInterval(() => setTick(t => t + 1), 60000); return () => clearInterval(iv); }, []);
+
+  const currentHour = getCityTime(city.utc).getHours();
+  const W = 500, H = 110, PL = 28, PR = 10, PT = 22, PB = 28;
+  const cW = W - PL - PR, cH = H - PT - PB;
+  const minBpm = 50, maxBpm = 120;
+
+  const data = Array.from({ length: 24 }, (_, h) => ({
+    h,
+    bpm: getHourlyBPM(city, h),
+    mood: getMood(h, city.density),
+  }));
+
+  const xS = h => PL + (h / 23) * cW;
+  const yS = bpm => PT + (1 - (bpm - minBpm) / (maxBpm - minBpm)) * cH;
+
+  const linePath = data.map((d, i) => `${i === 0 ? "M" : "L"} ${xS(d.h).toFixed(1)} ${yS(d.bpm).toFixed(1)}`).join(" ");
+  const fillPath = linePath + ` L ${xS(23).toFixed(1)} ${(PT + cH).toFixed(1)} L ${xS(0).toFixed(1)} ${(PT + cH).toFixed(1)} Z`;
+
+  const curX = xS(currentHour);
+  const curY = yS(data[currentHour].bpm);
+
+  return (
+    <div style={{ marginBottom: "12px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+        <div style={{ fontSize: "8px", letterSpacing: "2px", opacity: 0.3 }}>24H MOOD TIMELINE</div>
+        <div style={{ fontSize: "9px", fontWeight: 700, color: getMoodColor(data[currentHour].mood) }}>
+          {data[currentHour].mood} · {data[currentHour].bpm} BPM
+        </div>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
+        <defs>
+          <linearGradient id={`tl-${city.id}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={city.accent} stopOpacity="0.28" />
+            <stop offset="100%" stopColor={city.accent} stopOpacity="0.01" />
+          </linearGradient>
+        </defs>
+
+        {/* Grid */}
+        {[60, 80, 100].map(b => (
+          <g key={b}>
+            <line x1={PL} x2={W - PR} y1={yS(b)} y2={yS(b)} stroke="rgba(255,255,255,.04)" strokeWidth="1" />
+            <text x={PL - 3} y={yS(b) + 2} textAnchor="end" fill="rgba(255,255,255,.12)" fontSize="6" fontFamily="'JetBrains Mono',monospace">{b}</text>
+          </g>
+        ))}
+
+        {/* Mood color dots strip at bottom */}
+        {data.map(d => (
+          <rect key={d.h} x={xS(d.h) - cW / 48} y={PT + cH + 4} width={cW / 24} height="3"
+            fill={getMoodColor(d.mood)} opacity="0.5" rx="1" />
+        ))}
+
+        {/* Area fill */}
+        <path d={fillPath} fill={`url(#tl-${city.id})`} />
+
+        {/* Line */}
+        <path d={linePath} fill="none" stroke={city.accent} strokeWidth="1.8"
+          strokeLinecap="round" strokeLinejoin="round" />
+
+        {/* Hour dots at mood transitions */}
+        {data.filter((_, i) => i % 6 === 0).map(d => (
+          <circle key={d.h} cx={xS(d.h)} cy={yS(d.bpm)} r="2.5"
+            fill={getMoodColor(d.mood)} stroke="#0d0d0d" strokeWidth="1" />
+        ))}
+
+        {/* Current hour marker */}
+        <line x1={curX} x2={curX} y1={PT} y2={PT + cH}
+          stroke={city.accent} strokeWidth="1" strokeDasharray="3,2" opacity="0.6" />
+        <circle cx={curX} cy={curY} r="4" fill={city.accent} stroke="#0d0d0d" strokeWidth="1.5" />
+
+        {/* X-axis labels */}
+        {[0, 6, 12, 18].map(h => (
+          <text key={h} x={xS(h)} y={H - 2} textAnchor="middle"
+            fill="rgba(255,255,255,.2)" fontSize="7" fontFamily="'JetBrains Mono',monospace">
+            {h === 0 ? "12a" : h === 6 ? "6a" : h === 12 ? "12p" : "6p"}
+          </text>
+        ))}
+
+        {/* BPM label header */}
+        <text x={PL} y={PT - 6} fill="rgba(255,255,255,.12)" fontSize="6"
+          fontFamily="'JetBrains Mono',monospace">BPM</text>
+      </svg>
+
+      {/* Mood legend */}
+      <div style={{ display: "flex", gap: "3px", flexWrap: "wrap", marginTop: "6px" }}>
+        {data.filter((_, i) => i % 6 === 0).map(d => (
+          <div key={d.h} style={{ fontSize: "8px", padding: "2px 6px", borderRadius: "10px",
+            background: `${getMoodColor(d.mood)}18`, color: getMoodColor(d.mood),
+            border: `1px solid ${getMoodColor(d.mood)}30` }}>
+            {d.h === 0 ? "12a" : d.h === 6 ? "6a" : d.h === 12 ? "12p" : "6p"} · {d.mood}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TimelineView({ city1, city2 }) {
+  return (
+    <div style={{ maxWidth: "800px", margin: "0 auto" }}>
+      <div style={{ padding: "16px", borderRadius: "12px", background: `${city1.accent}06`, border: `1px solid ${city1.accent}18`, marginBottom: "10px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
+          <span style={{ fontSize: "20px" }}>{city1.flag}</span>
+          <span style={{ fontWeight: 700, fontSize: "13px" }}>{city1.name}</span>
+        </div>
+        <MoodTimeline city={city1} />
+      </div>
+      <div style={{ padding: "16px", borderRadius: "12px", background: `${city2.accent}06`, border: `1px solid ${city2.accent}18` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
+          <span style={{ fontSize: "20px" }}>{city2.flag}</span>
+          <span style={{ fontWeight: 700, fontSize: "13px" }}>{city2.name}</span>
+        </div>
+        <MoodTimeline city={city2} />
+      </div>
+    </div>
+  );
+}
 
 function HeartbeatLine({ rate, color, w = 260 }) {
   const [off, setOff] = useState(0);
@@ -153,6 +325,19 @@ function CityPulse({ city }) {
   const phase = getDayPhase(h);
   const timeStr = time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true });
 
+  const audioCtxRef = useRef(null);
+  const [soundOn, setSoundOn] = useState(false);
+  useHeartbeatSound(audioCtxRef.current, hr, soundOn);
+
+  const toggleSound = () => {
+    if (!audioCtxRef.current) {
+      audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    } else if (audioCtxRef.current.state === "suspended") {
+      audioCtxRef.current.resume();
+    }
+    setSoundOn(s => !s);
+  };
+
   return (
     <div style={{ flex: 1, position: "relative", padding: "20px 16px", borderRadius: "14px", overflow: "hidden", minWidth: 0, background: `linear-gradient(135deg, ${city.accent}08 0%, #0d0d0d 100%)`, border: `1px solid ${city.accent}22` }}>
       {/* Aurora */}
@@ -181,7 +366,17 @@ function CityPulse({ city }) {
 
         {/* Heartbeat */}
         <div style={{ textAlign: "center", margin: "10px 0" }}>
-          <div style={{ fontSize: "8px", letterSpacing: "2px", opacity: .3 }}>HEARTBEAT — {hr} BPM</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", marginBottom: "2px" }}>
+            <div style={{ fontSize: "8px", letterSpacing: "2px", opacity: .3 }}>HEARTBEAT — {hr} BPM</div>
+            <button onClick={toggleSound} title={soundOn ? "Mute heartbeat" : "Play heartbeat sound"} style={{
+              padding: "2px 8px", borderRadius: "10px", fontSize: "9px", cursor: "pointer",
+              border: `1px solid ${soundOn ? city.accent : "rgba(255,255,255,.12)"}`,
+              background: soundOn ? `${city.accent}22` : "rgba(255,255,255,.04)",
+              color: soundOn ? city.accent : "#555", fontFamily: "'DM Sans'", transition: "all .2s",
+            }}>
+              {soundOn ? "🔊 ON" : "🔇 OFF"}
+            </button>
+          </div>
           <div style={{ display: "flex", justifyContent: "center" }}><HeartbeatLine rate={hr} color={city.accent} /></div>
         </div>
 
@@ -388,6 +583,7 @@ export default function LivePulse() {
 
   const tabs = [
     { id: "pulse", label: "🧠 Pulse" },
+    { id: "timeline", label: "📊 Timeline" },
     { id: "duel", label: "⚔️ Duel" },
     { id: "oracle", label: "🔮 Oracle" },
   ];
@@ -497,6 +693,7 @@ export default function LivePulse() {
             </div>
           </div>
         )}
+        {tab === "timeline" && <div style={{ animation: "slideUp .4s ease-out" }}><TimelineView city1={city1} city2={city2} /></div>}
         {tab === "duel" && <div style={{ animation: "slideUp .4s ease-out" }}><DuelView city1={city1} city2={city2} /></div>}
         {tab === "oracle" && <div style={{ animation: "slideUp .4s ease-out" }}><OracleChat city1={city1} city2={city2} /></div>}
       </div>
