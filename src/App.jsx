@@ -46,6 +46,11 @@ const CITY_DB = [
   { id:"stockholm", name:"Stockholm", country:"Sweden", flag:"🇸🇪", lat:59.33, lng:18.07, pop:"0.98M", area:"188km²", density:"5,200/km²", tz:"GMT+2", utc:2, currency:"SEK kr", lang:"Swedish", accent:"#006AA7", continent:"Europe" },
 ];
 
+const LS = {
+  get: (k, fallback) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fallback; } catch { return fallback; } },
+  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+
 function getCityTime(utc) {
   const d = new Date();
   return new Date(d.getTime() + d.getTimezoneOffset() * 60000 + utc * 3600000);
@@ -290,7 +295,7 @@ function DayNightBar({ utc }) {
   );
 }
 
-function CityCard({ city, onSelect, selected }) {
+function CityCard({ city, onSelect, selected, isFavorite, onToggleFavorite }) {
   const t = getCityTime(city.utc);
   const h = t.getHours();
   const phase = getDayPhase(h);
@@ -300,7 +305,17 @@ function CityCard({ city, onSelect, selected }) {
       border: selected ? `2px solid ${city.accent}` : "2px solid rgba(255,255,255,.06)",
       background: selected ? `${city.accent}15` : "rgba(255,255,255,.02)",
       color: "#e0e0e0", fontFamily: "'DM Sans',sans-serif", transition: "all .2s", width: "100%",
+      position: "relative",
     }}>
+      {onToggleFavorite && (
+        <span onClick={e => { e.stopPropagation(); onToggleFavorite(city.id); }} style={{
+          position: "absolute", top: "5px", right: "6px", fontSize: "12px",
+          color: isFavorite ? "#F7C948" : "rgba(255,255,255,.2)", cursor: "pointer", userSelect: "none",
+          lineHeight: 1,
+        }}>
+          {isFavorite ? "★" : "☆"}
+        </span>
+      )}
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
         <span style={{ fontSize: "20px" }}>{city.flag}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -440,10 +455,17 @@ function TimeBridge({ city1, city2 }) {
 }
 
 function OracleChat({ city1, city2 }) {
+  const pairKey = `livepulse_oracle_${[city1.id, city2.id].sort().join("_")}`;
   const [q, setQ] = useState("");
   const [ans, setAns] = useState("");
   const [loading, setLoading] = useState(false);
-  const [history, setHistory] = useState([]);
+  const [history, setHistory] = useState(() => LS.get(pairKey, []));
+
+  useEffect(() => {
+    setHistory(LS.get(pairKey, []));
+    setAns("");
+  }, [pairKey]);
+
   const ask = async () => {
     if (!q.trim() || loading) return;
     setLoading(true); setAns("");
@@ -462,10 +484,21 @@ Answer poetically but with specific data in 2-4 sentences: "${question}"` }],
       const data = await res.json();
       const text = data.content?.map(c => c.text || "").join("") || "The Oracle meditates...";
       setAns(text);
-      setHistory(h => [...h.slice(-3), { q: question, a: text }]);
+      setHistory(h => {
+        const next = [...h, { q: question, a: text }].slice(-20);
+        LS.set(pairKey, next);
+        return next;
+      });
     } catch { setAns("Connection disrupted. Try again."); }
     setLoading(false);
   };
+
+  const clearHistory = () => {
+    setHistory([]);
+    LS.set(pairKey, []);
+    setAns("");
+  };
+
   return (
     <div style={{ maxWidth: "680px", margin: "0 auto" }}>
       <div style={{ textAlign: "center", marginBottom: "16px" }}>
@@ -473,6 +506,11 @@ Answer poetically but with specific data in 2-4 sentences: "${question}"` }],
         <h2 style={{ fontSize: "18px", fontWeight: 900, fontFamily: "'Playfair Display',serif", margin: "4px 0 2px" }}>The Oracle</h2>
         <div style={{ fontSize: "9px", opacity: .25 }}>AI intelligence comparing {city1.name} and {city2.name}</div>
       </div>
+      {history.length > 0 && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "6px" }}>
+          <button onClick={clearHistory} style={{ padding: "2px 8px", borderRadius: "10px", border: "1px solid rgba(255,255,255,.06)", background: "none", color: "#555", fontSize: "9px", cursor: "pointer", fontFamily: "'DM Sans'" }}>Clear history</button>
+        </div>
+      )}
       {history.map((h, i) => (
         <div key={i} style={{ marginBottom: "8px" }}>
           <div style={{ fontSize: "9px", opacity: .3, marginBottom: "2px" }}>You: {h.q}</div>
@@ -646,6 +684,8 @@ export default function LivePulse() {
   const [selecting, setSelecting] = useState(null); // null | 1 | 2
   const [showPro, setShowPro] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [favorites, setFavorites] = useState(() => LS.get("livepulse_favorites", []));
+  const [recents, setRecents] = useState(() => LS.get("livepulse_recents", []));
 
   const city1 = CITY_DB.find(c => c.id === city1Id);
   const city2 = CITY_DB.find(c => c.id === city2Id);
@@ -677,11 +717,33 @@ export default function LivePulse() {
     return CITY_DB.filter(c => c.name.toLowerCase().includes(s) || c.country.toLowerCase().includes(s) || c.continent.toLowerCase().includes(s));
   }, [search]);
 
+  const sortedFiltered = useMemo(() => {
+    if (!favorites.length) return filtered;
+    const favSet = new Set(favorites);
+    return [...filtered.filter(c => favSet.has(c.id)), ...filtered.filter(c => !favSet.has(c.id))];
+  }, [filtered, favorites]);
+
   const selectCity = (id) => {
+    const n1 = selecting === 1 ? id : city1Id;
+    const n2 = selecting === 2 ? id : city2Id;
     if (selecting === 1) setCity1Id(id);
     else if (selecting === 2) setCity2Id(id);
+    setRecents(prev => {
+      const pair = { c1: n1, c2: n2 };
+      const next = [pair, ...prev.filter(p => !(p.c1 === n1 && p.c2 === n2))].slice(0, 5);
+      LS.set("livepulse_recents", next);
+      return next;
+    });
     setSelecting(null);
     setSearch("");
+  };
+
+  const toggleFavorite = (id) => {
+    setFavorites(prev => {
+      const next = prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id];
+      LS.set("livepulse_favorites", next);
+      return next;
+    });
   };
 
   const tabs = [
@@ -738,11 +800,32 @@ export default function LivePulse() {
       {/* CITY PICKER DROPDOWN */}
       {selecting && (
         <div style={{ maxWidth: "500px", margin: "0 auto", padding: "0 16px 12px", animation: "fadeIn .3s" }}>
+          {recents.length > 0 && (
+            <div style={{ marginBottom: "8px" }}>
+              <div style={{ fontSize: "9px", letterSpacing: "2px", opacity: .3, marginBottom: "4px" }}>RECENT</div>
+              <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                {recents.map((r, i) => {
+                  const rc1 = CITY_DB.find(c => c.id === r.c1);
+                  const rc2 = CITY_DB.find(c => c.id === r.c2);
+                  if (!rc1 || !rc2) return null;
+                  return (
+                    <button key={i} onClick={() => { setCity1Id(r.c1); setCity2Id(r.c2); setSelecting(null); setSearch(""); }} style={{
+                      padding: "3px 8px", borderRadius: "12px", border: "1px solid rgba(255,255,255,.08)",
+                      background: "rgba(255,255,255,.03)", color: "#aaa", fontSize: "9px", cursor: "pointer", fontFamily: "'DM Sans'",
+                    }}>
+                      {rc1.flag} {rc1.name} vs {rc2.flag} {rc2.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <input type="text" value={search} onChange={e => setSearch(e.target.value)} autoFocus
             placeholder="Search 40+ cities..." style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(255,255,255,.1)", background: "rgba(255,255,255,.04)", color: "#fff", fontSize: "13px", outline: "none", fontFamily: "'DM Sans'", marginBottom: "8px" }} />
           <div style={{ maxHeight: "250px", overflowY: "auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px" }}>
-            {filtered.map(c => (
-              <CityCard key={c.id} city={c} onSelect={selectCity} selected={c.id === (selecting === 1 ? city1Id : city2Id)} />
+            {sortedFiltered.map(c => (
+              <CityCard key={c.id} city={c} onSelect={selectCity} selected={c.id === (selecting === 1 ? city1Id : city2Id)}
+                isFavorite={favorites.includes(c.id)} onToggleFavorite={toggleFavorite} />
             ))}
           </div>
         </div>
