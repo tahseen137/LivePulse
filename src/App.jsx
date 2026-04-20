@@ -51,6 +51,16 @@ const LS = {
   set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
 
+// ── Feature 7: Filter config ───────────────────────────────
+const CONTINENT_FILTERS = ["Africa", "Asia", "Europe", "North America", "South America", "Oceania"];
+const UTC_RANGES = [
+  { label: "≤ UTC−5", range: [-12, -5] },
+  { label: "UTC−4 to 0", range: [-4, 0] },
+  { label: "UTC+1 to +4", range: [1, 4] },
+  { label: "UTC+5 to +8", range: [5, 8] },
+  { label: "UTC+9+", range: [9, 14] },
+];
+
 function getCityTime(utc) {
   const d = new Date();
   return new Date(d.getTime() + d.getTimezoneOffset() * 60000 + utc * 3600000);
@@ -331,6 +341,24 @@ function CityCard({ city, onSelect, selected, isFavorite, onToggleFavorite }) {
   );
 }
 
+// ── Feature 7: Filter Chips ────────────────────────────────
+function FilterChips({ continentFilter, setContinentFilter, utcFilter, setUtcFilter }) {
+  const chipBase = { padding: "3px 10px", borderRadius: "16px", fontSize: "9px", cursor: "pointer", fontFamily: "'DM Sans'", border: "1px solid rgba(255,255,255,.08)", background: "rgba(255,255,255,.02)", color: "#666", transition: "all .15s" };
+  const chipActive = { ...chipBase, background: "rgba(255,255,255,.1)", color: "#e0e0e0", border: "1px solid rgba(255,255,255,.2)" };
+  return (
+    <div style={{ marginBottom: "8px" }}>
+      <div style={{ fontSize: "7px", letterSpacing: "2px", opacity: .25, marginBottom: "4px" }}>CONTINENT</div>
+      <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginBottom: "8px" }}>
+        {CONTINENT_FILTERS.map(c => <button key={c} onClick={() => setContinentFilter(continentFilter === c ? null : c)} style={continentFilter === c ? chipActive : chipBase}>{c}</button>)}
+      </div>
+      <div style={{ fontSize: "7px", letterSpacing: "2px", opacity: .25, marginBottom: "4px" }}>TIMEZONE</div>
+      <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+        {UTC_RANGES.map(u => { const active = utcFilter && utcFilter[0] === u.range[0]; return <button key={u.label} onClick={() => setUtcFilter(active ? null : u.range)} style={active ? chipActive : chipBase}>{u.label}</button>; })}
+      </div>
+    </div>
+  );
+}
+
 function CityPulse({ city }) {
   const [time, setTime] = useState(getCityTime(city.utc));
   useEffect(() => { const iv = setInterval(() => setTime(getCityTime(city.utc)), 1000); return () => clearInterval(iv); }, [city.utc]);
@@ -425,37 +453,34 @@ function CityPulse({ city }) {
   );
 }
 
-function TimeBridge({ city1, city2 }) {
+// ── Feature 8: TimeBridge supports optional 3rd city ──────
+function TimeBridge({ city1, city2, city3 }) {
   const [, setT] = useState(0);
   useEffect(() => { const iv = setInterval(() => setT(t => t + 1), 1000); return () => clearInterval(iv); }, []);
-  const h1 = getCityTime(city1.utc).getHours(), h2 = getCityTime(city2.utc).getHours();
-  const p1 = getDayPhase(h1), p2 = getDayPhase(h2);
-  const diff = Math.abs(city1.utc - city2.utc);
+  const cities = city3 ? [city1, city2, city3] : [city1, city2];
+  const phases = cities.map(c => getDayPhase(getCityTime(c.utc).getHours()));
   return (
     <div style={{ padding: "14px", borderRadius: "10px", background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.05)", marginBottom: "10px" }}>
       <div style={{ fontSize: "8px", letterSpacing: "3px", opacity: .3, marginBottom: "8px", textAlign: "center" }}>⏳ TIME BRIDGE</div>
       <div style={{ display: "flex", justifyContent: "space-around", alignItems: "center" }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: "22px" }}>{p1.e}</div>
-          <div style={{ fontSize: "12px", fontWeight: 700, color: city1.accent }}>{city1.name}</div>
-          <div style={{ fontSize: "9px", opacity: .4 }}>{p1.p} — {p1.d}</div>
-        </div>
-        <div style={{ textAlign: "center", opacity: .2 }}>
-          <div style={{ fontSize: "16px" }}>↔</div>
-          <div style={{ fontSize: "8px", letterSpacing: "1px" }}>{diff}H APART</div>
-        </div>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: "22px" }}>{p2.e}</div>
-          <div style={{ fontSize: "12px", fontWeight: 700, color: city2.accent }}>{city2.name}</div>
-          <div style={{ fontSize: "9px", opacity: .4 }}>{p2.p} — {p2.d}</div>
-        </div>
+        {cities.map((city, i) => (
+          <>
+            <div key={city.id} style={{ textAlign: "center" }}>
+              <div style={{ fontSize: "22px" }}>{phases[i].e}</div>
+              <div style={{ fontSize: "12px", fontWeight: 700, color: city.accent }}>{city.name}</div>
+              <div style={{ fontSize: "9px", opacity: .4 }}>{phases[i].p} — {phases[i].d}</div>
+            </div>
+            {i < cities.length - 1 && <div key={`gap-${i}`} style={{ textAlign: "center", opacity: .2 }}><div style={{ fontSize: "16px" }}>↔</div><div style={{ fontSize: "8px", letterSpacing: "1px" }}>{Math.abs(cities[i].utc - cities[i + 1].utc)}H</div></div>}
+          </>
+        ))}
       </div>
     </div>
   );
 }
 
-function OracleChat({ city1, city2, isPro, onUpgrade }) {
-  const pairKey = `livepulse_oracle_${[city1.id, city2.id].sort().join("_")}`;
+// ── Feature 8: OracleChat supports optional 3rd city ──────
+function OracleChat({ city1, city2, city3, isPro, onUpgrade }) {
+  const pairKey = `livepulse_oracle_${[city1.id, city2.id, city3?.id].filter(Boolean).sort().join("_")}`;
   const [q, setQ] = useState("");
   const [ans, setAns] = useState("");
   const [loading, setLoading] = useState(false);
@@ -482,6 +507,7 @@ function OracleChat({ city1, city2, isPro, onUpgrade }) {
           question,
           city1: { name: city1.name, country: city1.country, pop: city1.pop, density: city1.density, currency: city1.currency, lang: city1.lang, tz: city1.tz },
           city2: { name: city2.name, country: city2.country, pop: city2.pop, density: city2.density, currency: city2.currency, lang: city2.lang, tz: city2.tz },
+          ...(city3 ? { city3: { name: city3.name, country: city3.country, pop: city3.pop, density: city3.density, currency: city3.currency, lang: city3.lang, tz: city3.tz } } : {}),
         }),
       });
       if (res.status === 429) {
@@ -515,7 +541,7 @@ function OracleChat({ city1, city2, isPro, onUpgrade }) {
       <div style={{ textAlign: "center", marginBottom: "16px" }}>
         <div style={{ fontSize: "40px", animation: "float 3s ease-in-out infinite" }}>🔮</div>
         <h2 style={{ fontSize: "18px", fontWeight: 900, fontFamily: "'Playfair Display',serif", margin: "4px 0 2px" }}>The Oracle</h2>
-        <div style={{ fontSize: "9px", opacity: .25 }}>AI intelligence comparing {city1.name} and {city2.name}</div>
+        <div style={{ fontSize: "9px", opacity: .25 }}>AI intelligence comparing {city3 ? `${city1.name}, ${city2.name} and ${city3.name}` : `${city1.name} and ${city2.name}`}</div>
       </div>
       {history.length > 0 && (
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "6px" }}>
@@ -563,54 +589,59 @@ function OracleChat({ city1, city2, isPro, onUpgrade }) {
   );
 }
 
-function DuelView({ city1, city2 }) {
-  const bars = [
-    { l: "Population", d: parseFloat(city1.pop), t: parseFloat(city2.pop), u: "M" },
-    { l: "Density", d: parseFloat(city1.density.replace(/[^0-9.]/g, "")), t: parseFloat(city2.density.replace(/[^0-9.]/g, "")), u: "/km²" },
+// ── Feature 8: DuelView supports optional 3rd city ────────
+function DuelView({ city1, city2, city3 }) {
+  const cities = city3 ? [city1, city2, city3] : [city1, city2];
+  const cityMetrics = cities.map(city => ({
+    population: parseFloat(city.pop),
+    density: parseFloat(city.density.replace(/[^0-9.]/g, "")),
+    energy: getHeartRate(city),
+  }));
+  const metrics = [
+    { label: "Population", key: "population", unit: "M" },
+    { label: "Density (/km²)", key: "density", unit: "" },
+    { label: "Energy (BPM)", key: "energy", unit: "" },
   ];
-  const hr1 = getHeartRate(city1), hr2 = getHeartRate(city2);
-  bars.push({ l: "Energy (BPM)", d: hr1, t: hr2, u: "" });
   return (
-    <div style={{ maxWidth: "600px", margin: "0 auto" }}>
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "20px", marginBottom: "16px" }}>
-        <div style={{ textAlign: "center" }}><div style={{ fontSize: "28px" }}>{city1.flag}</div><div style={{ fontSize: "12px", fontWeight: 700, color: city1.accent }}>{city1.name}</div></div>
-        <div style={{ fontSize: "10px", opacity: .15, letterSpacing: "3px" }}>VS</div>
-        <div style={{ textAlign: "center" }}><div style={{ fontSize: "28px" }}>{city2.flag}</div><div style={{ fontSize: "12px", fontWeight: 700, color: city2.accent }}>{city2.name}</div></div>
+    <div style={{ maxWidth: "680px", margin: "0 auto" }}>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "16px", marginBottom: "20px", flexWrap: "wrap" }}>
+        {cities.map((city, i) => (
+          <div key={city.id} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {i > 0 && <div style={{ fontSize: "10px", opacity: .15, letterSpacing: "3px" }}>VS</div>}
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: "28px" }}>{city.flag}</div>
+              <div style={{ fontSize: "12px", fontWeight: 700, color: city.accent }}>{city.name}</div>
+            </div>
+          </div>
+        ))}
       </div>
-      {bars.map((b, i) => {
-        const max = Math.max(b.d, b.t) || 1;
+      {metrics.map((metric, mi) => {
+        const values = cityMetrics.map(m => m[metric.key]);
+        const max = Math.max(...values) || 1;
+        const winnerIdx = values.indexOf(Math.max(...values));
         return (
-          <div key={i} style={{ marginBottom: "10px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "9px", marginBottom: "2px" }}>
-              <span style={{ color: b.d >= b.t ? city1.accent : "#555", fontWeight: b.d >= b.t ? 700 : 400 }}>{b.d.toLocaleString()}{b.u}{b.d >= b.t ? " 👑" : ""}</span>
-              <span style={{ opacity: .3, letterSpacing: "1px" }}>{b.l}</span>
-              <span style={{ color: b.t > b.d ? city2.accent : "#555", fontWeight: b.t > b.d ? 700 : 400 }}>{b.t > b.d ? "👑 " : ""}{b.t.toLocaleString()}{b.u}</span>
-            </div>
-            <div style={{ display: "flex", gap: "2px", height: "5px" }}>
-              <div style={{ flex: 1, borderRadius: "3px", background: "rgba(255,255,255,.04)", overflow: "hidden", direction: "rtl" }}>
-                <div style={{ height: "100%", width: `${(b.d / max) * 100}%`, borderRadius: "3px", background: city1.accent }} />
+          <div key={mi} style={{ marginBottom: "16px" }}>
+            <div style={{ fontSize: "8px", letterSpacing: "2px", opacity: .3, marginBottom: "6px", textAlign: "center" }}>{metric.label.toUpperCase()}</div>
+            {cities.map((city, ci) => (
+              <div key={city.id} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "5px" }}>
+                <div style={{ width: "70px", textAlign: "right", fontSize: "9px", color: ci === winnerIdx ? city.accent : "#555", fontWeight: ci === winnerIdx ? 700 : 400, flexShrink: 0 }}>
+                  {ci === winnerIdx ? "👑 " : ""}{values[ci].toLocaleString()}{metric.unit}
+                </div>
+                <div style={{ flex: 1, height: "6px", borderRadius: "3px", background: "rgba(255,255,255,.04)", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${(values[ci] / max) * 100}%`, borderRadius: "3px", background: city.accent, transition: "width .5s" }} />
+                </div>
+                <div style={{ width: "72px", fontSize: "9px", color: city.accent, opacity: .7, flexShrink: 0 }}>{city.flag} {city.name}</div>
               </div>
-              <div style={{ flex: 1, borderRadius: "3px", background: "rgba(255,255,255,.04)", overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${(b.t / max) * 100}%`, borderRadius: "3px", background: city2.accent }} />
-              </div>
-            </div>
+            ))}
           </div>
         );
       })}
-      {/* Quick Facts */}
-      <div style={{ padding: "12px", borderRadius: "8px", background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.04)", marginTop: "12px" }}>
+      <div style={{ padding: "12px", borderRadius: "8px", background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.04)", marginTop: "12px", overflowX: "auto" }}>
         <div style={{ fontSize: "8px", letterSpacing: "2px", opacity: .3, marginBottom: "8px" }}>📋 QUICK FACTS</div>
-        {[
-          ["🌍 Continent", city1.continent, city2.continent],
-          ["💱 Currency", city1.currency, city2.currency],
-          ["🗣️ Language", city1.lang, city2.lang],
-          ["📐 Area", city1.area, city2.area],
-          ["⏰ Timezone", city1.tz, city2.tz],
-        ].map(([l, d, t], i) => (
+        {[["🌍 Continent", "continent"], ["💱 Currency", "currency"], ["🗣️ Language", "lang"], ["📐 Area", "area"], ["⏰ Timezone", "tz"]].map(([label, key], i) => (
           <div key={i} style={{ display: "flex", padding: "3px 0", borderBottom: i < 4 ? "1px solid rgba(255,255,255,.03)" : "none", fontSize: "10px" }}>
-            <div style={{ width: "90px", opacity: .3 }}>{l}</div>
-            <div style={{ flex: 1, color: city1.accent }}>{d}</div>
-            <div style={{ flex: 1, color: city2.accent }}>{t}</div>
+            <div style={{ width: "90px", opacity: .3, flexShrink: 0 }}>{label}</div>
+            {cities.map(city => <div key={city.id} style={{ flex: 1, color: city.accent, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{city[key]}</div>)}
           </div>
         ))}
       </div>
@@ -707,7 +738,10 @@ export default function LivePulse() {
   });
   const [tab, setTab] = useState("pulse");
   const [search, setSearch] = useState("");
-  const [selecting, setSelecting] = useState(null); // null | 1 | 2
+  const [city3Id, setCity3Id] = useState(null);
+  const [selecting, setSelecting] = useState(null); // null | 1 | 2 | 3
+  const [continentFilter, setContinentFilter] = useState(null);
+  const [utcFilter, setUtcFilter] = useState(null);
   const [showPro, setShowPro] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [favorites, setFavorites] = useState(() => LS.get("livepulse_favorites", []));
@@ -755,6 +789,7 @@ export default function LivePulse() {
 
   const city1 = CITY_DB.find(c => c.id === city1Id);
   const city2 = CITY_DB.find(c => c.id === city2Id);
+  const city3 = city3Id ? CITY_DB.find(c => c.id === city3Id) : null;
 
   // Sync URL and meta tags whenever cities change
   useEffect(() => {
@@ -778,10 +813,15 @@ export default function LivePulse() {
   const shareUrl = `${window.location.origin}${window.location.pathname}?c1=${city1Id}&c2=${city2Id}`;
 
   const filtered = useMemo(() => {
-    if (!search) return CITY_DB;
-    const s = search.toLowerCase();
-    return CITY_DB.filter(c => c.name.toLowerCase().includes(s) || c.country.toLowerCase().includes(s) || c.continent.toLowerCase().includes(s));
-  }, [search]);
+    let results = CITY_DB;
+    if (search) {
+      const s = search.toLowerCase();
+      results = results.filter(c => c.name.toLowerCase().includes(s) || c.country.toLowerCase().includes(s) || c.continent.toLowerCase().includes(s));
+    }
+    if (continentFilter) results = results.filter(c => c.continent.includes(continentFilter));
+    if (utcFilter) { const [min, max] = utcFilter; results = results.filter(c => c.utc >= min && c.utc <= max); }
+    return results;
+  }, [search, continentFilter, utcFilter]);
 
   const sortedFiltered = useMemo(() => {
     if (!favorites.length) return filtered;
@@ -789,17 +829,24 @@ export default function LivePulse() {
     return [...filtered.filter(c => favSet.has(c.id)), ...filtered.filter(c => !favSet.has(c.id))];
   }, [filtered, favorites]);
 
+  const openPicker = (slot) => { setSelecting(selecting === slot ? null : slot); setSearch(""); setContinentFilter(null); setUtcFilter(null); };
+  const removeCity3 = () => { setCity3Id(null); if (selecting === 3) setSelecting(null); };
+  const currentSelectedId = selecting === 1 ? city1Id : selecting === 2 ? city2Id : city3Id;
+
   const selectCity = (id) => {
     const n1 = selecting === 1 ? id : city1Id;
     const n2 = selecting === 2 ? id : city2Id;
     if (selecting === 1) setCity1Id(id);
     else if (selecting === 2) setCity2Id(id);
-    setRecents(prev => {
-      const pair = { c1: n1, c2: n2 };
-      const next = [pair, ...prev.filter(p => !(p.c1 === n1 && p.c2 === n2))].slice(0, 5);
-      LS.set("livepulse_recents", next);
-      return next;
-    });
+    else if (selecting === 3) setCity3Id(id);
+    if (selecting !== 3) {
+      setRecents(prev => {
+        const pair = { c1: n1, c2: n2 };
+        const next = [pair, ...prev.filter(p => !(p.c1 === n1 && p.c2 === n2))].slice(0, 5);
+        LS.set("livepulse_recents", next);
+        return next;
+      });
+    }
     setSelecting(null);
     setSearch("");
   };
@@ -844,19 +891,41 @@ export default function LivePulse() {
 
       {/* CITY SELECTOR BAR */}
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "8px", padding: "10px 16px", flexWrap: "wrap" }}>
-        <button onClick={() => setSelecting(selecting === 1 ? null : 1)} style={{
+        <button onClick={() => openPicker(1)} style={{
           padding: "8px 16px", borderRadius: "8px", cursor: "pointer", fontFamily: "'DM Sans'", fontSize: "13px",
           border: `2px solid ${city1.accent}${selecting === 1 ? "" : "44"}`, background: selecting === 1 ? `${city1.accent}22` : "rgba(255,255,255,.03)", color: "#fff",
         }}>
           {city1.flag} {city1.name}
         </button>
         <span style={{ opacity: .15, fontSize: "12px", letterSpacing: "2px" }}>VS</span>
-        <button onClick={() => setSelecting(selecting === 2 ? null : 2)} style={{
+        <button onClick={() => openPicker(2)} style={{
           padding: "8px 16px", borderRadius: "8px", cursor: "pointer", fontFamily: "'DM Sans'", fontSize: "13px",
           border: `2px solid ${city2.accent}${selecting === 2 ? "" : "44"}`, background: selecting === 2 ? `${city2.accent}22` : "rgba(255,255,255,.03)", color: "#fff",
         }}>
           {city2.flag} {city2.name}
         </button>
+        {city3 ? (
+          <>
+            <span style={{ opacity: .15, fontSize: "11px", letterSpacing: "2px" }}>VS</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
+              <button onClick={() => openPicker(3)} style={{
+                padding: "8px 16px", borderRadius: "8px 0 0 8px", cursor: "pointer", fontFamily: "'DM Sans'", fontSize: "13px",
+                border: `2px solid ${city3.accent}${selecting === 3 ? "" : "44"}`, borderRight: "none", background: selecting === 3 ? `${city3.accent}22` : "rgba(255,255,255,.03)", color: "#fff",
+              }}>
+                {city3.flag} {city3.name}
+              </button>
+              <button onClick={removeCity3} style={{
+                padding: "8px 8px", borderRadius: "0 8px 8px 0", cursor: "pointer", fontFamily: "'DM Sans'", fontSize: "12px",
+                border: `2px solid ${city3.accent}44`, borderLeft: "none", background: "rgba(255,255,255,.03)", color: "#888",
+              }}>✕</button>
+            </div>
+          </>
+        ) : (
+          <button onClick={() => { setCity3Id("london"); openPicker(3); }} style={{
+            padding: "8px 14px", borderRadius: "8px", cursor: "pointer", fontFamily: "'DM Sans'", fontSize: "12px",
+            border: "2px dashed rgba(255,255,255,.12)", background: "rgba(255,255,255,.02)", color: "#555",
+          }}>+ City</button>
+        )}
         <button onClick={() => setShowShare(true)} title="Share this comparison" style={{
           padding: "8px 12px", borderRadius: "8px", cursor: "pointer", fontFamily: "'DM Sans'", fontSize: "13px",
           border: "2px solid rgba(255,255,255,.1)", background: "rgba(255,255,255,.04)", color: "#aaa",
@@ -866,7 +935,7 @@ export default function LivePulse() {
       {/* CITY PICKER DROPDOWN */}
       {selecting && (
         <div style={{ maxWidth: "500px", margin: "0 auto", padding: "0 16px 12px", animation: "fadeIn .3s" }}>
-          {recents.length > 0 && (
+          {selecting !== 3 && recents.length > 0 && (
             <div style={{ marginBottom: "8px" }}>
               <div style={{ fontSize: "9px", letterSpacing: "2px", opacity: .3, marginBottom: "4px" }}>RECENT</div>
               <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
@@ -886,13 +955,17 @@ export default function LivePulse() {
               </div>
             </div>
           )}
+          <FilterChips continentFilter={continentFilter} setContinentFilter={setContinentFilter} utcFilter={utcFilter} setUtcFilter={setUtcFilter} />
           <input type="text" value={search} onChange={e => setSearch(e.target.value)} autoFocus
             placeholder="Search 40+ cities..." style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(255,255,255,.1)", background: "rgba(255,255,255,.04)", color: "#fff", fontSize: "13px", outline: "none", fontFamily: "'DM Sans'", marginBottom: "8px" }} />
           <div style={{ maxHeight: "250px", overflowY: "auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px" }}>
-            {sortedFiltered.map(c => (
-              <CityCard key={c.id} city={c} onSelect={selectCity} selected={c.id === (selecting === 1 ? city1Id : city2Id)}
-                isFavorite={favorites.includes(c.id)} onToggleFavorite={toggleFavorite} />
-            ))}
+            {sortedFiltered.length === 0
+              ? <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "20px", fontSize: "11px", opacity: .3 }}>No cities match these filters</div>
+              : sortedFiltered.map(c => (
+                <CityCard key={c.id} city={c} onSelect={selectCity} selected={c.id === currentSelectedId}
+                  isFavorite={favorites.includes(c.id)} onToggleFavorite={toggleFavorite} />
+              ))
+            }
           </div>
         </div>
       )}
@@ -954,16 +1027,17 @@ export default function LivePulse() {
       <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 10px 30px" }}>
         {tab === "pulse" && (
           <div style={{ animation: "slideUp .4s ease-out" }}>
-            <TimeBridge city1={city1} city2={city2} />
+            <TimeBridge city1={city1} city2={city2} city3={city3} />
             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-              <div style={{ flex: "1 1 360px", minWidth: "300px" }}><CityPulse city={city1} /></div>
-              <div style={{ flex: "1 1 360px", minWidth: "300px" }}><CityPulse city={city2} /></div>
+              <div style={{ flex: "1 1 280px", minWidth: "260px" }}><CityPulse city={city1} /></div>
+              <div style={{ flex: "1 1 280px", minWidth: "260px" }}><CityPulse city={city2} /></div>
+              {city3 && <div style={{ flex: "1 1 280px", minWidth: "260px" }}><CityPulse city={city3} /></div>}
             </div>
           </div>
         )}
         {tab === "timeline" && <div style={{ animation: "slideUp .4s ease-out" }}><TimelineView city1={city1} city2={city2} /></div>}
-        {tab === "duel" && <div style={{ animation: "slideUp .4s ease-out" }}><DuelView city1={city1} city2={city2} /></div>}
-        {tab === "oracle" && <div style={{ animation: "slideUp .4s ease-out" }}><OracleChat city1={city1} city2={city2} isPro={isPro} onUpgrade={() => setShowPro(true)} /></div>}
+        {tab === "duel" && <div style={{ animation: "slideUp .4s ease-out" }}><DuelView city1={city1} city2={city2} city3={city3} /></div>}
+        {tab === "oracle" && <div style={{ animation: "slideUp .4s ease-out" }}><OracleChat city1={city1} city2={city2} city3={city3} isPro={isPro} onUpgrade={() => setShowPro(true)} /></div>}
       </div>
 
       {/* FOOTER */}
