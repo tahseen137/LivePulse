@@ -1,50 +1,197 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 
 // ══════════════════════════════════════════════════════════
-// CITY DATABASE — 50+ global cities with real data
+// CITY DATABASE — 40 global cities with real data
 // ══════════════════════════════════════════════════════════
 const CITY_DB = [
-  { id:"dhaka", name:"Dhaka", country:"Bangladesh", flag:"🇧🇩", lat:23.81, lng:90.41, pop:"22.4M", area:"306km²", density:"73,200/km²", tz:"GMT+6", utc:6, currency:"BDT ৳", lang:"Bengali", accent:"#FF6B35", continent:"Asia" },
-  { id:"toronto", name:"Toronto", country:"Canada", flag:"🇨🇦", lat:43.65, lng:-79.38, pop:"2.9M", area:"630km²", density:"4,600/km²", tz:"GMT-4", utc:-4, currency:"CAD $", lang:"English", accent:"#4A90D9", continent:"North America" },
-  { id:"tokyo", name:"Tokyo", country:"Japan", flag:"🇯🇵", lat:35.68, lng:139.69, pop:"13.9M", area:"2,194km²", density:"6,300/km²", tz:"GMT+9", utc:9, currency:"JPY ¥", lang:"Japanese", accent:"#E63946", continent:"Asia" },
-  { id:"london", name:"London", country:"UK", flag:"🇬🇧", lat:51.51, lng:-0.13, pop:"8.9M", area:"1,572km²", density:"5,700/km²", tz:"GMT+1", utc:1, currency:"GBP £", lang:"English", accent:"#1E3A5F", continent:"Europe" },
-  { id:"nyc", name:"New York", country:"USA", flag:"🇺🇸", lat:40.71, lng:-74.01, pop:"8.3M", area:"783km²", density:"10,600/km²", tz:"GMT-4", utc:-4, currency:"USD $", lang:"English", accent:"#FFB400", continent:"North America" },
-  { id:"dubai", name:"Dubai", country:"UAE", flag:"🇦🇪", lat:25.20, lng:55.27, pop:"3.6M", area:"4,114km²", density:"870/km²", tz:"GMT+4", utc:4, currency:"AED د.إ", lang:"Arabic", accent:"#C9A227", continent:"Asia" },
-  { id:"singapore", name:"Singapore", country:"Singapore", flag:"🇸🇬", lat:1.35, lng:103.82, pop:"5.9M", area:"733km²", density:"8,000/km²", tz:"GMT+8", utc:8, currency:"SGD $", lang:"English/Malay", accent:"#D0021B", continent:"Asia" },
-  { id:"mumbai", name:"Mumbai", country:"India", flag:"🇮🇳", lat:19.08, lng:72.88, pop:"21M", area:"603km²", density:"34,800/km²", tz:"GMT+5:30", utc:5.5, currency:"INR ₹", lang:"Hindi/Marathi", accent:"#FF9933", continent:"Asia" },
-  { id:"istanbul", name:"Istanbul", country:"Turkey", flag:"🇹🇷", lat:41.01, lng:28.98, pop:"15.8M", area:"5,343km²", density:"2,960/km²", tz:"GMT+3", utc:3, currency:"TRY ₺", lang:"Turkish", accent:"#E30A17", continent:"Europe/Asia" },
-  { id:"seoul", name:"Seoul", country:"South Korea", flag:"🇰🇷", lat:37.57, lng:126.98, pop:"9.7M", area:"605km²", density:"16,000/km²", tz:"GMT+9", utc:9, currency:"KRW ₩", lang:"Korean", accent:"#003DA5", continent:"Asia" },
-  { id:"bangkok", name:"Bangkok", country:"Thailand", flag:"🇹🇭", lat:13.76, lng:100.50, pop:"10.7M", area:"1,569km²", density:"6,800/km²", tz:"GMT+7", utc:7, currency:"THB ฿", lang:"Thai", accent:"#FF6700", continent:"Asia" },
-  { id:"paris", name:"Paris", country:"France", flag:"🇫🇷", lat:48.86, lng:2.35, pop:"2.2M", area:"105km²", density:"20,900/km²", tz:"GMT+2", utc:2, currency:"EUR €", lang:"French", accent:"#002395", continent:"Europe" },
-  { id:"berlin", name:"Berlin", country:"Germany", flag:"🇩🇪", lat:52.52, lng:13.41, pop:"3.7M", area:"892km²", density:"4,100/km²", tz:"GMT+2", utc:2, currency:"EUR €", lang:"German", accent:"#DD0000", continent:"Europe" },
-  { id:"sydney", name:"Sydney", country:"Australia", flag:"🇦🇺", lat:-33.87, lng:151.21, pop:"5.3M", area:"12,368km²", density:"430/km²", tz:"GMT+10", utc:10, currency:"AUD $", lang:"English", accent:"#00843D", continent:"Oceania" },
-  { id:"lagos", name:"Lagos", country:"Nigeria", flag:"🇳🇬", lat:6.52, lng:3.38, pop:"16.6M", area:"1,171km²", density:"14,200/km²", tz:"GMT+1", utc:1, currency:"NGN ₦", lang:"English/Yoruba", accent:"#008751", continent:"Africa" },
-  { id:"cairo", name:"Cairo", country:"Egypt", flag:"🇪🇬", lat:30.04, lng:31.24, pop:"10.1M", area:"3,085km²", density:"3,300/km²", tz:"GMT+2", utc:2, currency:"EGP £", lang:"Arabic", accent:"#C8102E", continent:"Africa" },
-  { id:"mexico_city", name:"Mexico City", country:"Mexico", flag:"🇲🇽", lat:19.43, lng:-99.13, pop:"9.2M", area:"1,495km²", density:"6,200/km²", tz:"GMT-6", utc:-6, currency:"MXN $", lang:"Spanish", accent:"#006847", continent:"North America" },
-  { id:"sao_paulo", name:"São Paulo", country:"Brazil", flag:"🇧🇷", lat:-23.55, lng:-46.63, pop:"12.3M", area:"1,521km²", density:"8,100/km²", tz:"GMT-3", utc:-3, currency:"BRL R$", lang:"Portuguese", accent:"#009C3B", continent:"South America" },
-  { id:"jakarta", name:"Jakarta", country:"Indonesia", flag:"🇮🇩", lat:-6.21, lng:106.85, pop:"10.6M", area:"664km²", density:"15,900/km²", tz:"GMT+7", utc:7, currency:"IDR Rp", lang:"Indonesian", accent:"#CE1126", continent:"Asia" },
-  { id:"kuala_lumpur", name:"Kuala Lumpur", country:"Malaysia", flag:"🇲🇾", lat:3.14, lng:101.69, pop:"1.8M", area:"243km²", density:"7,400/km²", tz:"GMT+8", utc:8, currency:"MYR RM", lang:"Malay", accent:"#010066", continent:"Asia" },
-  { id:"lisbon", name:"Lisbon", country:"Portugal", flag:"🇵🇹", lat:38.72, lng:-9.14, pop:"0.5M", area:"100km²", density:"5,100/km²", tz:"GMT+1", utc:1, currency:"EUR €", lang:"Portuguese", accent:"#006600", continent:"Europe" },
-  { id:"nairobi", name:"Nairobi", country:"Kenya", flag:"🇰🇪", lat:-1.29, lng:36.82, pop:"4.7M", area:"696km²", density:"6,800/km²", tz:"GMT+3", utc:3, currency:"KES KSh", lang:"Swahili/English", accent:"#006600", continent:"Africa" },
-  { id:"buenos_aires", name:"Buenos Aires", country:"Argentina", flag:"🇦🇷", lat:-34.60, lng:-58.38, pop:"3.1M", area:"203km²", density:"15,200/km²", tz:"GMT-3", utc:-3, currency:"ARS $", lang:"Spanish", accent:"#75AADB", continent:"South America" },
-  { id:"beijing", name:"Beijing", country:"China", flag:"🇨🇳", lat:39.90, lng:116.40, pop:"21.5M", area:"16,411km²", density:"1,300/km²", tz:"GMT+8", utc:8, currency:"CNY ¥", lang:"Mandarin", accent:"#DE2910", continent:"Asia" },
-  { id:"moscow", name:"Moscow", country:"Russia", flag:"🇷🇺", lat:55.76, lng:37.62, pop:"12.6M", area:"2,562km²", density:"4,900/km²", tz:"GMT+3", utc:3, currency:"RUB ₽", lang:"Russian", accent:"#0039A6", continent:"Europe" },
-  { id:"los_angeles", name:"Los Angeles", country:"USA", flag:"🇺🇸", lat:34.05, lng:-118.24, pop:"3.9M", area:"1,302km²", density:"3,000/km²", tz:"GMT-7", utc:-7, currency:"USD $", lang:"English/Spanish", accent:"#FDB515", continent:"North America" },
-  { id:"amsterdam", name:"Amsterdam", country:"Netherlands", flag:"🇳🇱", lat:52.37, lng:4.90, pop:"0.9M", area:"219km²", density:"4,100/km²", tz:"GMT+2", utc:2, currency:"EUR €", lang:"Dutch", accent:"#FF6600", continent:"Europe" },
-  { id:"barcelona", name:"Barcelona", country:"Spain", flag:"🇪🇸", lat:41.39, lng:2.17, pop:"1.6M", area:"101km²", density:"15,900/km²", tz:"GMT+2", utc:2, currency:"EUR €", lang:"Spanish/Catalan", accent:"#A50044", continent:"Europe" },
-  { id:"cape_town", name:"Cape Town", country:"South Africa", flag:"🇿🇦", lat:-33.93, lng:18.42, pop:"4.8M", area:"2,461km²", density:"1,900/km²", tz:"GMT+2", utc:2, currency:"ZAR R", lang:"English/Afrikaans", accent:"#007A4D", continent:"Africa" },
-  { id:"hanoi", name:"Hanoi", country:"Vietnam", flag:"🇻🇳", lat:21.03, lng:105.85, pop:"8.4M", area:"3,359km²", density:"2,500/km²", tz:"GMT+7", utc:7, currency:"VND ₫", lang:"Vietnamese", accent:"#DA251D", continent:"Asia" },
-  { id:"lima", name:"Lima", country:"Peru", flag:"🇵🇪", lat:-12.05, lng:-77.04, pop:"10.0M", area:"2,672km²", density:"3,700/km²", tz:"GMT-5", utc:-5, currency:"PEN S/", lang:"Spanish", accent:"#D91023", continent:"South America" },
-  { id:"manila", name:"Manila", country:"Philippines", flag:"🇵🇭", lat:14.60, lng:120.98, pop:"1.8M", area:"43km²", density:"42,900/km²", tz:"GMT+8", utc:8, currency:"PHP ₱", lang:"Filipino/English", accent:"#0038A8", continent:"Asia" },
-  { id:"taipei", name:"Taipei", country:"Taiwan", flag:"🇹🇼", lat:25.03, lng:121.57, pop:"2.6M", area:"272km²", density:"9,600/km²", tz:"GMT+8", utc:8, currency:"TWD NT$", lang:"Mandarin", accent:"#FE0000", continent:"Asia" },
-  { id:"vienna", name:"Vienna", country:"Austria", flag:"🇦🇹", lat:48.21, lng:16.37, pop:"1.9M", area:"415km²", density:"4,700/km²", tz:"GMT+2", utc:2, currency:"EUR €", lang:"German", accent:"#ED2939", continent:"Europe" },
-  { id:"rome", name:"Rome", country:"Italy", flag:"🇮🇹", lat:41.90, lng:12.50, pop:"2.8M", area:"1,285km²", density:"2,200/km²", tz:"GMT+2", utc:2, currency:"EUR €", lang:"Italian", accent:"#008C45", continent:"Europe" },
-  { id:"san_francisco", name:"San Francisco", country:"USA", flag:"🇺🇸", lat:37.77, lng:-122.42, pop:"0.9M", area:"121km²", density:"7,100/km²", tz:"GMT-7", utc:-7, currency:"USD $", lang:"English", accent:"#B7312C", continent:"North America" },
-  { id:"hong_kong", name:"Hong Kong", country:"China", flag:"🇭🇰", lat:22.32, lng:114.17, pop:"7.5M", area:"1,114km²", density:"6,700/km²", tz:"GMT+8", utc:8, currency:"HKD HK$", lang:"Cantonese/English", accent:"#DE2910", continent:"Asia" },
-  { id:"bogota", name:"Bogotá", country:"Colombia", flag:"🇨🇴", lat:4.71, lng:-74.07, pop:"7.2M", area:"1,587km²", density:"4,500/km²", tz:"GMT-5", utc:-5, currency:"COP $", lang:"Spanish", accent:"#FCD116", continent:"South America" },
-  { id:"warsaw", name:"Warsaw", country:"Poland", flag:"🇵🇱", lat:52.23, lng:21.01, pop:"1.8M", area:"517km²", density:"3,500/km²", tz:"GMT+2", utc:2, currency:"PLN zł", lang:"Polish", accent:"#DC143C", continent:"Europe" },
-  { id:"stockholm", name:"Stockholm", country:"Sweden", flag:"🇸🇪", lat:59.33, lng:18.07, pop:"0.98M", area:"188km²", density:"5,200/km²", tz:"GMT+2", utc:2, currency:"SEK kr", lang:"Swedish", accent:"#006AA7", continent:"Europe" },
+  { id:"dhaka",        name:"Dhaka",        country:"Bangladesh",   flag:"🇧🇩", lat:23.81,  lng:90.41,   pop:"22.4M", area:"306km²",     density:"73,200/km²", tz:"GMT+6",   utc:6,    currency:"BDT ৳",   lang:"Bengali",          accent:"#FF6B35", continent:"Asia" },
+  { id:"toronto",      name:"Toronto",      country:"Canada",       flag:"🇨🇦", lat:43.65,  lng:-79.38,  pop:"2.9M",  area:"630km²",     density:"4,600/km²",  tz:"GMT-4",   utc:-4,   currency:"CAD $",   lang:"English",          accent:"#4A90D9", continent:"North America" },
+  { id:"tokyo",        name:"Tokyo",        country:"Japan",        flag:"🇯🇵", lat:35.68,  lng:139.69,  pop:"13.9M", area:"2,194km²",   density:"6,300/km²",  tz:"GMT+9",   utc:9,    currency:"JPY ¥",   lang:"Japanese",         accent:"#E63946", continent:"Asia" },
+  { id:"london",       name:"London",       country:"UK",           flag:"🇬🇧", lat:51.51,  lng:-0.13,   pop:"8.9M",  area:"1,572km²",   density:"5,700/km²",  tz:"GMT+1",   utc:1,    currency:"GBP £",   lang:"English",          accent:"#1E3A5F", continent:"Europe" },
+  { id:"nyc",          name:"New York",     country:"USA",          flag:"🇺🇸", lat:40.71,  lng:-74.01,  pop:"8.3M",  area:"783km²",     density:"10,600/km²", tz:"GMT-4",   utc:-4,   currency:"USD $",   lang:"English",          accent:"#FFB400", continent:"North America" },
+  { id:"dubai",        name:"Dubai",        country:"UAE",          flag:"🇦🇪", lat:25.20,  lng:55.27,   pop:"3.6M",  area:"4,114km²",   density:"870/km²",    tz:"GMT+4",   utc:4,    currency:"AED د.إ", lang:"Arabic",           accent:"#C9A227", continent:"Asia" },
+  { id:"singapore",    name:"Singapore",    country:"Singapore",    flag:"🇸🇬", lat:1.35,   lng:103.82,  pop:"5.9M",  area:"733km²",     density:"8,000/km²",  tz:"GMT+8",   utc:8,    currency:"SGD $",   lang:"English/Malay",    accent:"#D0021B", continent:"Asia" },
+  { id:"mumbai",       name:"Mumbai",       country:"India",        flag:"🇮🇳", lat:19.08,  lng:72.88,   pop:"21M",   area:"603km²",     density:"34,800/km²", tz:"GMT+5:30",utc:5.5,  currency:"INR ₹",   lang:"Hindi/Marathi",    accent:"#FF9933", continent:"Asia" },
+  { id:"istanbul",     name:"Istanbul",     country:"Turkey",       flag:"🇹🇷", lat:41.01,  lng:28.98,   pop:"15.8M", area:"5,343km²",   density:"2,960/km²",  tz:"GMT+3",   utc:3,    currency:"TRY ₺",   lang:"Turkish",          accent:"#E30A17", continent:"Europe/Asia" },
+  { id:"seoul",        name:"Seoul",        country:"South Korea",  flag:"🇰🇷", lat:37.57,  lng:126.98,  pop:"9.7M",  area:"605km²",     density:"16,000/km²", tz:"GMT+9",   utc:9,    currency:"KRW ₩",   lang:"Korean",           accent:"#003DA5", continent:"Asia" },
+  { id:"bangkok",      name:"Bangkok",      country:"Thailand",     flag:"🇹🇭", lat:13.76,  lng:100.50,  pop:"10.7M", area:"1,569km²",   density:"6,800/km²",  tz:"GMT+7",   utc:7,    currency:"THB ฿",   lang:"Thai",             accent:"#FF6700", continent:"Asia" },
+  { id:"paris",        name:"Paris",        country:"France",       flag:"🇫🇷", lat:48.86,  lng:2.35,    pop:"2.2M",  area:"105km²",     density:"20,900/km²", tz:"GMT+2",   utc:2,    currency:"EUR €",   lang:"French",           accent:"#002395", continent:"Europe" },
+  { id:"berlin",       name:"Berlin",       country:"Germany",      flag:"🇩🇪", lat:52.52,  lng:13.41,   pop:"3.7M",  area:"892km²",     density:"4,100/km²",  tz:"GMT+2",   utc:2,    currency:"EUR €",   lang:"German",           accent:"#DD0000", continent:"Europe" },
+  { id:"sydney",       name:"Sydney",       country:"Australia",    flag:"🇦🇺", lat:-33.87, lng:151.21,  pop:"5.3M",  area:"12,368km²",  density:"430/km²",    tz:"GMT+10",  utc:10,   currency:"AUD $",   lang:"English",          accent:"#00843D", continent:"Oceania" },
+  { id:"lagos",        name:"Lagos",        country:"Nigeria",      flag:"🇳🇬", lat:6.52,   lng:3.38,    pop:"16.6M", area:"1,171km²",   density:"14,200/km²", tz:"GMT+1",   utc:1,    currency:"NGN ₦",   lang:"English/Yoruba",   accent:"#008751", continent:"Africa" },
+  { id:"cairo",        name:"Cairo",        country:"Egypt",        flag:"🇪🇬", lat:30.04,  lng:31.24,   pop:"10.1M", area:"3,085km²",   density:"3,300/km²",  tz:"GMT+2",   utc:2,    currency:"EGP £",   lang:"Arabic",           accent:"#C8102E", continent:"Africa" },
+  { id:"mexico_city",  name:"Mexico City",  country:"Mexico",       flag:"🇲🇽", lat:19.43,  lng:-99.13,  pop:"9.2M",  area:"1,495km²",   density:"6,200/km²",  tz:"GMT-6",   utc:-6,   currency:"MXN $",   lang:"Spanish",          accent:"#006847", continent:"North America" },
+  { id:"sao_paulo",    name:"São Paulo",    country:"Brazil",       flag:"🇧🇷", lat:-23.55, lng:-46.63,  pop:"12.3M", area:"1,521km²",   density:"8,100/km²",  tz:"GMT-3",   utc:-3,   currency:"BRL R$",  lang:"Portuguese",       accent:"#009C3B", continent:"South America" },
+  { id:"jakarta",      name:"Jakarta",      country:"Indonesia",    flag:"🇮🇩", lat:-6.21,  lng:106.85,  pop:"10.6M", area:"664km²",     density:"15,900/km²", tz:"GMT+7",   utc:7,    currency:"IDR Rp",  lang:"Indonesian",       accent:"#CE1126", continent:"Asia" },
+  { id:"kuala_lumpur", name:"Kuala Lumpur", country:"Malaysia",     flag:"🇲🇾", lat:3.14,   lng:101.69,  pop:"1.8M",  area:"243km²",     density:"7,400/km²",  tz:"GMT+8",   utc:8,    currency:"MYR RM",  lang:"Malay",            accent:"#010066", continent:"Asia" },
+  { id:"lisbon",       name:"Lisbon",       country:"Portugal",     flag:"🇵🇹", lat:38.72,  lng:-9.14,   pop:"0.5M",  area:"100km²",     density:"5,100/km²",  tz:"GMT+1",   utc:1,    currency:"EUR €",   lang:"Portuguese",       accent:"#006600", continent:"Europe" },
+  { id:"nairobi",      name:"Nairobi",      country:"Kenya",        flag:"🇰🇪", lat:-1.29,  lng:36.82,   pop:"4.7M",  area:"696km²",     density:"6,800/km²",  tz:"GMT+3",   utc:3,    currency:"KES KSh", lang:"Swahili/English",  accent:"#006600", continent:"Africa" },
+  { id:"buenos_aires", name:"Buenos Aires", country:"Argentina",    flag:"🇦🇷", lat:-34.60, lng:-58.38,  pop:"3.1M",  area:"203km²",     density:"15,200/km²", tz:"GMT-3",   utc:-3,   currency:"ARS $",   lang:"Spanish",          accent:"#75AADB", continent:"South America" },
+  { id:"beijing",      name:"Beijing",      country:"China",        flag:"🇨🇳", lat:39.90,  lng:116.40,  pop:"21.5M", area:"16,411km²",  density:"1,300/km²",  tz:"GMT+8",   utc:8,    currency:"CNY ¥",   lang:"Mandarin",         accent:"#DE2910", continent:"Asia" },
+  { id:"moscow",       name:"Moscow",       country:"Russia",       flag:"🇷🇺", lat:55.76,  lng:37.62,   pop:"12.6M", area:"2,562km²",   density:"4,900/km²",  tz:"GMT+3",   utc:3,    currency:"RUB ₽",   lang:"Russian",          accent:"#0039A6", continent:"Europe" },
+  { id:"los_angeles",  name:"Los Angeles",  country:"USA",          flag:"🇺🇸", lat:34.05,  lng:-118.24, pop:"3.9M",  area:"1,302km²",   density:"3,000/km²",  tz:"GMT-7",   utc:-7,   currency:"USD $",   lang:"English/Spanish",  accent:"#FDB515", continent:"North America" },
+  { id:"amsterdam",    name:"Amsterdam",    country:"Netherlands",  flag:"🇳🇱", lat:52.37,  lng:4.90,    pop:"0.9M",  area:"219km²",     density:"4,100/km²",  tz:"GMT+2",   utc:2,    currency:"EUR €",   lang:"Dutch",            accent:"#FF6600", continent:"Europe" },
+  { id:"barcelona",    name:"Barcelona",    country:"Spain",        flag:"🇪🇸", lat:41.39,  lng:2.17,    pop:"1.6M",  area:"101km²",     density:"15,900/km²", tz:"GMT+2",   utc:2,    currency:"EUR €",   lang:"Spanish/Catalan",  accent:"#A50044", continent:"Europe" },
+  { id:"cape_town",    name:"Cape Town",    country:"South Africa", flag:"🇿🇦", lat:-33.93, lng:18.42,   pop:"4.8M",  area:"2,461km²",   density:"1,900/km²",  tz:"GMT+2",   utc:2,    currency:"ZAR R",   lang:"English/Afrikaans",accent:"#007A4D", continent:"Africa" },
+  { id:"hanoi",        name:"Hanoi",        country:"Vietnam",      flag:"🇻🇳", lat:21.03,  lng:105.85,  pop:"8.4M",  area:"3,359km²",   density:"2,500/km²",  tz:"GMT+7",   utc:7,    currency:"VND ₫",   lang:"Vietnamese",       accent:"#DA251D", continent:"Asia" },
+  { id:"lima",         name:"Lima",         country:"Peru",         flag:"🇵🇪", lat:-12.05, lng:-77.04,  pop:"10.0M", area:"2,672km²",   density:"3,700/km²",  tz:"GMT-5",   utc:-5,   currency:"PEN S/",  lang:"Spanish",          accent:"#D91023", continent:"South America" },
+  { id:"manila",       name:"Manila",       country:"Philippines",  flag:"🇵🇭", lat:14.60,  lng:120.98,  pop:"1.8M",  area:"43km²",      density:"42,900/km²", tz:"GMT+8",   utc:8,    currency:"PHP ₱",   lang:"Filipino/English", accent:"#0038A8", continent:"Asia" },
+  { id:"taipei",       name:"Taipei",       country:"Taiwan",       flag:"🇹🇼", lat:25.03,  lng:121.57,  pop:"2.6M",  area:"272km²",     density:"9,600/km²",  tz:"GMT+8",   utc:8,    currency:"TWD NT$", lang:"Mandarin",         accent:"#FE0000", continent:"Asia" },
+  { id:"vienna",       name:"Vienna",       country:"Austria",      flag:"🇦🇹", lat:48.21,  lng:16.37,   pop:"1.9M",  area:"415km²",     density:"4,700/km²",  tz:"GMT+2",   utc:2,    currency:"EUR €",   lang:"German",           accent:"#ED2939", continent:"Europe" },
+  { id:"rome",         name:"Rome",         country:"Italy",        flag:"🇮🇹", lat:41.90,  lng:12.50,   pop:"2.8M",  area:"1,285km²",   density:"2,200/km²",  tz:"GMT+2",   utc:2,    currency:"EUR €",   lang:"Italian",          accent:"#008C45", continent:"Europe" },
+  { id:"san_francisco",name:"San Francisco",country:"USA",          flag:"🇺🇸", lat:37.77,  lng:-122.42, pop:"0.9M",  area:"121km²",     density:"7,100/km²",  tz:"GMT-7",   utc:-7,   currency:"USD $",   lang:"English",          accent:"#B7312C", continent:"North America" },
+  { id:"hong_kong",    name:"Hong Kong",    country:"China",        flag:"🇭🇰", lat:22.32,  lng:114.17,  pop:"7.5M",  area:"1,114km²",   density:"6,700/km²",  tz:"GMT+8",   utc:8,    currency:"HKD HK$", lang:"Cantonese/English",accent:"#DE2910", continent:"Asia" },
+  { id:"bogota",       name:"Bogotá",       country:"Colombia",     flag:"🇨🇴", lat:4.71,   lng:-74.07,  pop:"7.2M",  area:"1,587km²",   density:"4,500/km²",  tz:"GMT-5",   utc:-5,   currency:"COP $",   lang:"Spanish",          accent:"#FCD116", continent:"South America" },
+  { id:"warsaw",       name:"Warsaw",       country:"Poland",       flag:"🇵🇱", lat:52.23,  lng:21.01,   pop:"1.8M",  area:"517km²",     density:"3,500/km²",  tz:"GMT+2",   utc:2,    currency:"PLN zł",  lang:"Polish",           accent:"#DC143C", continent:"Europe" },
+  { id:"stockholm",    name:"Stockholm",    country:"Sweden",       flag:"🇸🇪", lat:59.33,  lng:18.07,   pop:"0.98M", area:"188km²",     density:"5,200/km²",  tz:"GMT+2",   utc:2,    currency:"SEK kr",  lang:"Swedish",          accent:"#006AA7", continent:"Europe" },
 ];
+
+// ══════════════════════════════════════════════════════════
+// COST OF LIVING — monthly estimates in USD
+// ══════════════════════════════════════════════════════════
+const COST_OF_LIVING = {
+  dhaka:         { rent: 300,  food: 150, transport: 30,  entertainment: 50  },
+  toronto:       { rent: 2200, food: 600, transport: 150, entertainment: 300 },
+  tokyo:         { rent: 1400, food: 500, transport: 120, entertainment: 250 },
+  london:        { rent: 2500, food: 700, transport: 180, entertainment: 350 },
+  nyc:           { rent: 3500, food: 800, transport: 130, entertainment: 400 },
+  dubai:         { rent: 2000, food: 500, transport: 100, entertainment: 350 },
+  singapore:     { rent: 2800, food: 600, transport: 100, entertainment: 300 },
+  mumbai:        { rent: 600,  food: 200, transport: 50,  entertainment: 100 },
+  istanbul:      { rent: 500,  food: 300, transport: 50,  entertainment: 150 },
+  seoul:         { rent: 1200, food: 400, transport: 100, entertainment: 200 },
+  bangkok:       { rent: 800,  food: 300, transport: 50,  entertainment: 150 },
+  paris:         { rent: 2200, food: 700, transport: 90,  entertainment: 350 },
+  berlin:        { rent: 1500, food: 500, transport: 100, entertainment: 250 },
+  sydney:        { rent: 2000, food: 600, transport: 150, entertainment: 300 },
+  lagos:         { rent: 700,  food: 300, transport: 80,  entertainment: 100 },
+  cairo:         { rent: 400,  food: 200, transport: 40,  entertainment: 80  },
+  mexico_city:   { rent: 700,  food: 300, transport: 50,  entertainment: 150 },
+  sao_paulo:     { rent: 900,  food: 350, transport: 70,  entertainment: 200 },
+  jakarta:       { rent: 600,  food: 250, transport: 50,  entertainment: 120 },
+  kuala_lumpur:  { rent: 700,  food: 300, transport: 60,  entertainment: 150 },
+  lisbon:        { rent: 1400, food: 500, transport: 80,  entertainment: 200 },
+  nairobi:       { rent: 600,  food: 300, transport: 60,  entertainment: 120 },
+  buenos_aires:  { rent: 700,  food: 300, transport: 50,  entertainment: 150 },
+  beijing:       { rent: 1200, food: 400, transport: 70,  entertainment: 200 },
+  moscow:        { rent: 800,  food: 400, transport: 60,  entertainment: 200 },
+  los_angeles:   { rent: 2800, food: 700, transport: 200, entertainment: 400 },
+  amsterdam:     { rent: 2000, food: 600, transport: 120, entertainment: 300 },
+  barcelona:     { rent: 1600, food: 550, transport: 100, entertainment: 280 },
+  cape_town:     { rent: 700,  food: 300, transport: 70,  entertainment: 150 },
+  hanoi:         { rent: 600,  food: 200, transport: 40,  entertainment: 100 },
+  lima:          { rent: 500,  food: 250, transport: 50,  entertainment: 120 },
+  manila:        { rent: 500,  food: 200, transport: 40,  entertainment: 100 },
+  taipei:        { rent: 900,  food: 350, transport: 80,  entertainment: 200 },
+  vienna:        { rent: 1500, food: 500, transport: 100, entertainment: 250 },
+  rome:          { rent: 1400, food: 550, transport: 100, entertainment: 250 },
+  san_francisco: { rent: 3600, food: 800, transport: 150, entertainment: 450 },
+  hong_kong:     { rent: 3000, food: 700, transport: 100, entertainment: 350 },
+  bogota:        { rent: 500,  food: 250, transport: 50,  entertainment: 120 },
+  warsaw:        { rent: 800,  food: 400, transport: 70,  entertainment: 180 },
+  stockholm:     { rent: 1700, food: 600, transport: 120, entertainment: 280 },
+};
+
+// ══════════════════════════════════════════════════════════
+// LIVABILITY SCORES — 8 dimensions [0-100]
+// Order: Safety, Affordability, Internet, Weather, Culture, Food, Transport, Nightlife
+// ══════════════════════════════════════════════════════════
+const LIVABILITY = {
+  dhaka:         [30, 90, 55, 45, 70, 80, 55, 40],
+  toronto:       [78, 35, 85, 45, 85, 85, 70, 70],
+  tokyo:         [92, 40, 95, 65, 95, 98, 95, 85],
+  london:        [72, 25, 88, 45, 95, 88, 85, 85],
+  nyc:           [60, 20, 82, 55, 98, 95, 75, 95],
+  dubai:         [88, 40, 85, 35, 70, 85, 70, 60],
+  singapore:     [95, 35, 95, 40, 80, 95, 97, 65],
+  mumbai:        [45, 75, 65, 40, 85, 90, 60, 55],
+  istanbul:      [55, 70, 72, 65, 90, 92, 65, 75],
+  seoul:         [88, 55, 98, 60, 90, 95, 92, 90],
+  bangkok:       [65, 75, 78, 35, 82, 92, 65, 88],
+  paris:         [65, 30, 85, 55, 98, 97, 85, 85],
+  berlin:        [72, 50, 80, 45, 92, 82, 88, 98],
+  sydney:        [80, 30, 78, 80, 82, 85, 72, 70],
+  lagos:         [30, 72, 45, 45, 75, 78, 35, 70],
+  cairo:         [40, 80, 55, 50, 85, 82, 50, 45],
+  mexico_city:   [40, 72, 70, 65, 88, 90, 65, 75],
+  sao_paulo:     [35, 65, 72, 55, 82, 88, 60, 80],
+  jakarta:       [45, 75, 68, 35, 75, 85, 55, 55],
+  kuala_lumpur:  [72, 72, 80, 40, 75, 90, 68, 62],
+  lisbon:        [82, 52, 78, 75, 88, 88, 70, 80],
+  nairobi:       [38, 70, 65, 68, 72, 72, 40, 60],
+  buenos_aires:  [45, 72, 72, 65, 88, 88, 68, 90],
+  beijing:       [78, 60, 55, 45, 90, 90, 85, 65],
+  moscow:        [55, 62, 80, 20, 90, 82, 82, 75],
+  los_angeles:   [52, 22, 88, 85, 88, 90, 40, 80],
+  amsterdam:     [78, 38, 90, 45, 88, 82, 88, 85],
+  barcelona:     [62, 45, 85, 78, 92, 95, 80, 95],
+  cape_town:     [38, 70, 68, 80, 78, 80, 50, 68],
+  hanoi:         [70, 80, 72, 45, 80, 88, 55, 60],
+  lima:          [42, 72, 65, 55, 75, 85, 55, 62],
+  manila:        [40, 75, 65, 35, 72, 82, 45, 65],
+  taipei:        [90, 60, 95, 55, 85, 95, 90, 72],
+  vienna:        [88, 42, 88, 52, 95, 88, 90, 72],
+  rome:          [65, 45, 78, 72, 98, 97, 65, 80],
+  san_francisco: [48, 15, 92, 72, 88, 92, 65, 72],
+  hong_kong:     [88, 28, 92, 45, 88, 95, 95, 80],
+  bogota:        [38, 72, 70, 62, 78, 80, 58, 68],
+  warsaw:        [78, 62, 88, 35, 82, 82, 80, 75],
+  stockholm:     [85, 32, 92, 35, 88, 82, 85, 68],
+};
+
+const LIVABILITY_LABELS = ["Safety", "Affordability", "Internet", "Weather", "Culture", "Food", "Transport", "Nightlife"];
+
+// ══════════════════════════════════════════════════════════
+// HISTORICAL POPULATION TRENDS — millions, 2020–2024
+// ══════════════════════════════════════════════════════════
+const HISTORY = {
+  dhaka:         [21.0, 21.5, 21.9, 22.2, 22.4],
+  toronto:       [2.73, 2.76, 2.80, 2.85, 2.93],
+  tokyo:         [13.96, 13.96, 13.95, 13.94, 13.92],
+  london:        [8.80, 8.82, 8.85, 8.87, 8.90],
+  nyc:           [8.34, 8.34, 8.34, 8.34, 8.34],
+  dubai:         [3.30, 3.40, 3.50, 3.55, 3.60],
+  singapore:     [5.69, 5.45, 5.64, 5.83, 5.92],
+  mumbai:        [20.4, 20.5, 20.7, 20.9, 21.0],
+  istanbul:      [15.0, 15.2, 15.4, 15.6, 15.8],
+  seoul:         [9.73, 9.72, 9.72, 9.71, 9.70],
+  bangkok:       [10.5, 10.6, 10.6, 10.7, 10.7],
+  paris:         [2.16, 2.17, 2.17, 2.18, 2.20],
+  berlin:        [3.64, 3.66, 3.68, 3.70, 3.71],
+  sydney:        [5.13, 5.23, 5.25, 5.28, 5.31],
+  lagos:         [15.3, 15.7, 16.0, 16.3, 16.6],
+  cairo:         [9.85, 9.90, 9.95, 10.0, 10.1],
+  mexico_city:   [8.96, 9.00, 9.05, 9.10, 9.20],
+  sao_paulo:     [12.1, 12.2, 12.2, 12.2, 12.3],
+  jakarta:       [10.5, 10.5, 10.6, 10.6, 10.6],
+  kuala_lumpur:  [1.73, 1.75, 1.76, 1.78, 1.80],
+  lisbon:        [0.505, 0.506, 0.507, 0.510, 0.513],
+  nairobi:       [4.4, 4.5, 4.5, 4.6, 4.7],
+  buenos_aires:  [3.05, 3.07, 3.08, 3.09, 3.10],
+  beijing:       [21.5, 21.5, 21.6, 21.6, 21.7],
+  moscow:        [12.5, 12.5, 12.6, 12.6, 12.6],
+  los_angeles:   [3.87, 3.88, 3.89, 3.90, 3.90],
+  amsterdam:     [0.87, 0.88, 0.88, 0.89, 0.90],
+  barcelona:     [1.61, 1.62, 1.62, 1.63, 1.63],
+  cape_town:     [4.6, 4.7, 4.7, 4.8, 4.8],
+  hanoi:         [8.0, 8.1, 8.2, 8.3, 8.4],
+  lima:          [9.75, 9.82, 9.88, 9.93, 10.0],
+  manila:        [1.78, 1.79, 1.80, 1.80, 1.80],
+  taipei:        [2.62, 2.63, 2.63, 2.64, 2.64],
+  vienna:        [1.88, 1.89, 1.90, 1.90, 1.92],
+  rome:          [2.80, 2.80, 2.80, 2.80, 2.82],
+  san_francisco: [0.874, 0.880, 0.880, 0.888, 0.900],
+  hong_kong:     [7.48, 7.41, 7.43, 7.47, 7.50],
+  bogota:        [7.08, 7.15, 7.18, 7.20, 7.24],
+  warsaw:        [1.77, 1.78, 1.79, 1.80, 1.80],
+  stockholm:     [0.970, 0.972, 0.974, 0.977, 0.980],
+};
+
+const HISTORY_YEARS = [2020, 2021, 2022, 2023, 2024];
+
+// ══════════════════════════════════════════════════════════
+// HELPER FUNCTIONS
+// ══════════════════════════════════════════════════════════
 
 function getCityTime(utc) {
   const d = new Date();
@@ -72,6 +219,26 @@ function getMood(h, density) {
   if (h >= 5 && h < 9) return d > 10000 ? "Surging" : "Awakening";
   if (h >= 9 && h < 17) return d > 15000 ? "Electrified" : d > 5000 ? "Focused" : "Contemplative";
   return d > 10000 ? "Vibrant" : "Relaxed";
+}
+
+function getAqiColor(aqi) {
+  if (!aqi) return "#888";
+  if (aqi <= 50) return "#00E400";
+  if (aqi <= 100) return "#FFFF00";
+  if (aqi <= 150) return "#FF7E00";
+  if (aqi <= 200) return "#FF0000";
+  if (aqi <= 300) return "#8F3F97";
+  return "#7E0023";
+}
+
+function getAqiLabel(aqi) {
+  if (!aqi) return "No data";
+  if (aqi <= 50) return "Good";
+  if (aqi <= 100) return "Moderate";
+  if (aqi <= 150) return "Unhealthy (Sensitive)";
+  if (aqi <= 200) return "Unhealthy";
+  if (aqi <= 300) return "Very Unhealthy";
+  return "Hazardous";
 }
 
 // ══════════════════════════════════════════════════════════
@@ -155,13 +322,10 @@ function CityPulse({ city }) {
 
   return (
     <div style={{ flex: 1, position: "relative", padding: "20px 16px", borderRadius: "14px", overflow: "hidden", minWidth: 0, background: `linear-gradient(135deg, ${city.accent}08 0%, #0d0d0d 100%)`, border: `1px solid ${city.accent}22` }}>
-      {/* Aurora */}
       <div style={{ position: "absolute", inset: 0, overflow: "hidden", opacity: .12, pointerEvents: "none" }}>
         <div style={{ position: "absolute", width: "200%", height: "200%", top: "-50%", left: "-30%", background: `radial-gradient(ellipse, ${city.accent}33, transparent 70%)`, animation: "aurora 10s ease-in-out infinite alternate" }} />
       </div>
-
       <div style={{ position: "relative", zIndex: 1 }}>
-        {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
           <span style={{ fontSize: "28px" }}>{city.flag}</span>
           <div>
@@ -169,29 +333,20 @@ function CityPulse({ city }) {
             <div style={{ fontSize: "9px", letterSpacing: "2px", opacity: .3 }}>{city.country} · {city.currency} · {city.lang}</div>
           </div>
         </div>
-
-        {/* Clock */}
         <div style={{ textAlign: "center", margin: "10px 0" }}>
           <div style={{ fontSize: "9px", letterSpacing: "3px", opacity: .3 }}>{phase.p.toUpperCase()}</div>
           <div style={{ fontSize: "24px", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>{timeStr}</div>
           <div style={{ fontSize: "9px", opacity: .25 }}>{city.tz}</div>
         </div>
-
         <DayNightBar utc={city.utc} />
-
-        {/* Heartbeat */}
         <div style={{ textAlign: "center", margin: "10px 0" }}>
           <div style={{ fontSize: "8px", letterSpacing: "2px", opacity: .3 }}>HEARTBEAT — {hr} BPM</div>
           <div style={{ display: "flex", justifyContent: "center" }}><HeartbeatLine rate={hr} color={city.accent} /></div>
         </div>
-
-        {/* Mood */}
         <div style={{ textAlign: "center", padding: "8px", borderRadius: "8px", background: `${city.accent}10`, border: `1px solid ${city.accent}18`, margin: "8px 0" }}>
           <div style={{ fontSize: "8px", letterSpacing: "2px", opacity: .25 }}>EMOTIONAL WEATHER</div>
           <div style={{ fontSize: "20px", fontWeight: 800, color: city.accent, fontFamily: "'Playfair Display',serif" }}>{mood}</div>
         </div>
-
-        {/* Stats Grid */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "4px", margin: "10px 0" }}>
           {[
             { l: "POP", v: city.pop, ic: "👥" },
@@ -205,8 +360,6 @@ function CityPulse({ city }) {
             </div>
           ))}
         </div>
-
-        {/* Continent badge */}
         <div style={{ textAlign: "center", margin: "6px 0" }}>
           <span style={{ fontSize: "9px", padding: "3px 10px", borderRadius: "20px", background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.06)", opacity: .5 }}>🌍 {city.continent}</span>
         </div>
@@ -244,39 +397,62 @@ function TimeBridge({ city1, city2 }) {
   );
 }
 
+// Oracle chat — powered by local Ollama (gemma4)
 function OracleChat({ city1, city2 }) {
   const [q, setQ] = useState("");
   const [ans, setAns] = useState("");
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState([]);
+
   const ask = async () => {
     if (!q.trim() || loading) return;
     setLoading(true); setAns("");
     const question = q; setQ("");
-    try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514", max_tokens: 1000,
-          messages: [{ role: "user", content: `You are "The Oracle" of LivePulse — an AI with deep awareness of cities. Today: ${new Date().toLocaleDateString()}.
-City 1: ${city1.name}, ${city1.country}. Pop: ${city1.pop}. Density: ${city1.density}. Currency: ${city1.currency}. Language: ${city1.lang}. TZ: ${city1.tz}.
+
+    const systemPrompt = `You are "The Oracle" of LivePulse — an AI with deep awareness of cities worldwide. Today: ${new Date().toLocaleDateString()}. Answer queries about cities with poetic flair but grounded in specific data. Keep responses to 2-4 sentences.`;
+
+    const messages = [
+      { role: "system", content: systemPrompt },
+      ...history.flatMap(h => [
+        { role: "user", content: h.q },
+        { role: "assistant", content: h.a },
+      ]),
+      {
+        role: "user",
+        content: `City 1: ${city1.name}, ${city1.country}. Pop: ${city1.pop}. Density: ${city1.density}. Currency: ${city1.currency}. Language: ${city1.lang}. TZ: ${city1.tz}.
 City 2: ${city2.name}, ${city2.country}. Pop: ${city2.pop}. Density: ${city2.density}. Currency: ${city2.currency}. Language: ${city2.lang}. TZ: ${city2.tz}.
-Answer poetically but with specific data in 2-4 sentences: "${question}"` }],
+Question: ${question}`,
+      },
+    ];
+
+    try {
+      const res = await fetch("http://localhost:11434/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "gemma4",
+          messages,
+          stream: false,
+          options: { temperature: 0.7, num_predict: 400 },
         }),
       });
+      if (!res.ok) throw new Error(`Ollama error: ${res.status}`);
       const data = await res.json();
-      const text = data.content?.map(c => c.text || "").join("") || "The Oracle meditates...";
+      const text = data.message?.content || "The Oracle meditates in silence...";
       setAns(text);
       setHistory(h => [...h.slice(-3), { q: question, a: text }]);
-    } catch { setAns("Connection disrupted. Try again."); }
+    } catch {
+      setAns("The Oracle is offline. Start Ollama locally (run: ollama serve) then refresh to awaken the Oracle.");
+    }
     setLoading(false);
   };
+
   return (
     <div style={{ maxWidth: "680px", margin: "0 auto" }}>
       <div style={{ textAlign: "center", marginBottom: "16px" }}>
         <div style={{ fontSize: "40px", animation: "float 3s ease-in-out infinite" }}>🔮</div>
         <h2 style={{ fontSize: "18px", fontWeight: 900, fontFamily: "'Playfair Display',serif", margin: "4px 0 2px" }}>The Oracle</h2>
-        <div style={{ fontSize: "9px", opacity: .25 }}>AI intelligence comparing {city1.name} and {city2.name}</div>
+        <div style={{ fontSize: "9px", opacity: .25 }}>Local AI comparing {city1.name} and {city2.name} · powered by Ollama gemma4</div>
       </div>
       {history.map((h, i) => (
         <div key={i} style={{ marginBottom: "8px" }}>
@@ -338,7 +514,6 @@ function DuelView({ city1, city2 }) {
           </div>
         );
       })}
-      {/* Quick Facts */}
       <div style={{ padding: "12px", borderRadius: "8px", background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.04)", marginTop: "12px" }}>
         <div style={{ fontSize: "8px", letterSpacing: "2px", opacity: .3, marginBottom: "8px" }}>📋 QUICK FACTS</div>
         {[
@@ -360,6 +535,363 @@ function DuelView({ city1, city2 }) {
 }
 
 // ══════════════════════════════════════════════════════════
+// PRO COMPONENTS
+// ══════════════════════════════════════════════════════════
+
+function MultiCityGrid({ multiCities, onToggleCity }) {
+  const cities = multiCities.map(id => CITY_DB.find(c => c.id === id)).filter(Boolean);
+  return (
+    <div>
+      <div style={{ marginBottom: "12px" }}>
+        <div style={{ fontSize: "8px", letterSpacing: "2px", opacity: .3, marginBottom: "8px", textAlign: "center" }}>SELECT CITIES (MAX 6)</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", justifyContent: "center", maxHeight: "140px", overflowY: "auto" }}>
+          {CITY_DB.map(c => {
+            const active = multiCities.includes(c.id);
+            return (
+              <button key={c.id} onClick={() => onToggleCity(c.id)} style={{
+                padding: "4px 8px", borderRadius: "16px", fontSize: "10px", cursor: "pointer", fontFamily: "'DM Sans'",
+                border: active ? `1px solid ${c.accent}` : "1px solid rgba(255,255,255,.06)",
+                background: active ? `${c.accent}22` : "rgba(255,255,255,.02)",
+                color: active ? c.accent : "#555", transition: "all .15s",
+              }}>
+                {c.flag} {c.name}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "10px" }}>
+        {cities.map(city => (
+          <CityPulse key={city.id} city={city} />
+        ))}
+      </div>
+      {cities.length === 0 && (
+        <div style={{ textAlign: "center", padding: "40px", opacity: .3 }}>Select cities above to compare them side by side</div>
+      )}
+    </div>
+  );
+}
+
+function CostOfLivingPanel({ multiCities }) {
+  const cities = multiCities.map(id => CITY_DB.find(c => c.id === id)).filter(Boolean);
+  const cats = [
+    { key: "rent", label: "🏠 Rent", color: "#4A90D9" },
+    { key: "food", label: "🍜 Food", color: "#FF9933" },
+    { key: "transport", label: "🚇 Transport", color: "#00843D" },
+    { key: "entertainment", label: "🎭 Entertainment", color: "#A50044" },
+  ];
+  const maxVals = cats.reduce((acc, cat) => {
+    acc[cat.key] = Math.max(...cities.map(c => COST_OF_LIVING[c.id]?.[cat.key] || 0)) || 1;
+    return acc;
+  }, {});
+
+  return (
+    <div style={{ maxWidth: "900px", margin: "0 auto" }}>
+      <div style={{ textAlign: "center", marginBottom: "16px" }}>
+        <div style={{ fontSize: "9px", letterSpacing: "3px", opacity: .3 }}>MONTHLY COST OF LIVING · USD ESTIMATES</div>
+      </div>
+      {cities.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "40px", opacity: .3 }}>Select cities in the Multi tab to compare costs</div>
+      ) : (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: `140px repeat(${cities.length}, 1fr)`, gap: "6px", marginBottom: "8px" }}>
+            <div />
+            {cities.map(c => (
+              <div key={c.id} style={{ textAlign: "center", fontSize: "11px", fontWeight: 700, color: c.accent }}>{c.flag} {c.name}</div>
+            ))}
+          </div>
+          {cats.map(cat => (
+            <div key={cat.key} style={{ marginBottom: "12px" }}>
+              <div style={{ fontSize: "9px", opacity: .4, marginBottom: "4px" }}>{cat.label}</div>
+              <div style={{ display: "grid", gridTemplateColumns: `140px repeat(${cities.length}, 1fr)`, gap: "6px", alignItems: "center" }}>
+                <div />
+                {cities.map(c => {
+                  const val = COST_OF_LIVING[c.id]?.[cat.key] || 0;
+                  const pct = (val / maxVals[cat.key]) * 100;
+                  return (
+                    <div key={c.id}>
+                      <div style={{ fontSize: "10px", fontWeight: 700, color: c.accent, marginBottom: "2px" }}>${val}/mo</div>
+                      <div style={{ height: "4px", borderRadius: "2px", background: "rgba(255,255,255,.05)", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${pct}%`, borderRadius: "2px", background: cat.color, opacity: .8 }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+          <div style={{ marginTop: "16px", padding: "12px", borderRadius: "8px", background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.04)" }}>
+            <div style={{ fontSize: "8px", letterSpacing: "2px", opacity: .3, marginBottom: "8px" }}>💰 MONTHLY TOTAL</div>
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${cities.length}, 1fr)`, gap: "8px" }}>
+              {cities.map(c => {
+                const col = COST_OF_LIVING[c.id] || {};
+                const total = (col.rent || 0) + (col.food || 0) + (col.transport || 0) + (col.entertainment || 0);
+                return (
+                  <div key={c.id} style={{ textAlign: "center", padding: "10px", borderRadius: "8px", background: `${c.accent}08`, border: `1px solid ${c.accent}22` }}>
+                    <div style={{ fontSize: "10px", opacity: .5 }}>{c.flag} {c.name}</div>
+                    <div style={{ fontSize: "20px", fontWeight: 900, color: c.accent, fontFamily: "'JetBrains Mono',monospace" }}>${total.toLocaleString()}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function AirQualityPanel({ multiCities }) {
+  const [airData, setAirData] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [lastFetch, setLastFetch] = useState(null);
+  const cities = multiCities.map(id => CITY_DB.find(c => c.id === id)).filter(Boolean);
+
+  const fetchAirData = useCallback(async () => {
+    if (cities.length === 0) return;
+    setLoading(true);
+    const results = await Promise.all(
+      cities.map(async city => {
+        try {
+          const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${city.lat}&longitude=${city.lng}&current=pm2_5,pm10,us_aqi&timezone=auto`;
+          const res = await fetch(url);
+          const data = await res.json();
+          return { id: city.id, pm25: data.current?.pm2_5, pm10: data.current?.pm10, aqi: data.current?.us_aqi };
+        } catch {
+          return { id: city.id, pm25: null, pm10: null, aqi: null };
+        }
+      })
+    );
+    const map = {};
+    results.forEach(r => { map[r.id] = r; });
+    setAirData(map);
+    setLastFetch(new Date());
+    setLoading(false);
+  }, [multiCities.join(",")]);
+
+  useEffect(() => { fetchAirData(); }, [fetchAirData]);
+
+  return (
+    <div style={{ maxWidth: "900px", margin: "0 auto" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+        <div style={{ fontSize: "9px", letterSpacing: "3px", opacity: .3 }}>REAL-TIME AIR QUALITY · OPEN-METEO</div>
+        <button onClick={fetchAirData} disabled={loading} style={{ padding: "4px 12px", borderRadius: "16px", border: "1px solid rgba(255,255,255,.1)", background: "rgba(255,255,255,.03)", color: "#888", fontSize: "9px", cursor: "pointer", fontFamily: "'DM Sans'" }}>
+          {loading ? "⏳ Loading..." : "↻ Refresh"}
+        </button>
+      </div>
+      {lastFetch && <div style={{ fontSize: "8px", opacity: .2, textAlign: "right", marginBottom: "10px" }}>Updated: {lastFetch.toLocaleTimeString()}</div>}
+      {cities.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "40px", opacity: .3 }}>Select cities in the Multi tab to view air quality</div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "10px" }}>
+          {cities.map(city => {
+            const d = airData[city.id];
+            const aqi = d?.aqi;
+            const aqiColor = getAqiColor(aqi);
+            return (
+              <div key={city.id} style={{ padding: "16px", borderRadius: "12px", background: `${city.accent}08`, border: `1px solid ${city.accent}22`, textAlign: "center" }}>
+                <div style={{ fontSize: "20px", marginBottom: "4px" }}>{city.flag}</div>
+                <div style={{ fontSize: "12px", fontWeight: 700, color: city.accent, marginBottom: "8px" }}>{city.name}</div>
+                {loading && !d ? (
+                  <div style={{ opacity: .3, fontSize: "10px" }}>Fetching...</div>
+                ) : (
+                  <>
+                    <div style={{ fontSize: "32px", fontWeight: 900, fontFamily: "'JetBrains Mono',monospace", color: aqiColor, marginBottom: "2px" }}>
+                      {aqi ?? "—"}
+                    </div>
+                    <div style={{ fontSize: "8px", color: aqiColor, fontWeight: 700, marginBottom: "8px" }}>{getAqiLabel(aqi)}</div>
+                    <div style={{ display: "flex", justifyContent: "space-around", fontSize: "9px", opacity: .6 }}>
+                      <span>PM2.5: <b>{d?.pm25?.toFixed(1) ?? "—"}</b></span>
+                      <span>PM10: <b>{d?.pm10?.toFixed(1) ?? "—"}</b></span>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <div style={{ marginTop: "16px", display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "center" }}>
+        {[
+          { range: "0–50", label: "Good", color: "#00E400" },
+          { range: "51–100", label: "Moderate", color: "#FFFF00" },
+          { range: "101–150", label: "Unhealthy (Sensitive)", color: "#FF7E00" },
+          { range: "151–200", label: "Unhealthy", color: "#FF0000" },
+          { range: "201+", label: "Very Unhealthy+", color: "#8F3F97" },
+        ].map(({ range, label, color }) => (
+          <div key={range} style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "8px", opacity: .6 }}>
+            <div style={{ width: "8px", height: "8px", borderRadius: "2px", background: color }} />
+            <span>{range} {label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RadarChart({ scores, color, size = 220 }) {
+  const n = LIVABILITY_LABELS.length;
+  const cx = size / 2, cy = size / 2;
+  const r = size * 0.36;
+  const angles = Array.from({ length: n }, (_, i) => (i * 2 * Math.PI / n) - Math.PI / 2);
+
+  const gridPoints = (level) =>
+    angles.map(a => {
+      const d = (level / 100) * r;
+      return `${(cx + d * Math.cos(a)).toFixed(1)},${(cy + d * Math.sin(a)).toFixed(1)}`;
+    }).join(" ");
+
+  const dataPoints = scores.map((val, i) => {
+    const a = angles[i];
+    const d = (val / 100) * r;
+    return [cx + d * Math.cos(a), cy + d * Math.sin(a)];
+  });
+
+  return (
+    <svg width={size} height={size} style={{ overflow: "visible" }}>
+      {[25, 50, 75, 100].map(level => (
+        <polygon key={level} points={gridPoints(level)} fill="none" stroke="rgba(255,255,255,.05)" strokeWidth="1" />
+      ))}
+      {angles.map((a, i) => (
+        <line key={i} x1={cx} y1={cy} x2={(cx + r * Math.cos(a)).toFixed(1)} y2={(cy + r * Math.sin(a)).toFixed(1)} stroke="rgba(255,255,255,.07)" strokeWidth="1" />
+      ))}
+      <polygon
+        points={dataPoints.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ")}
+        fill={`${color}28`}
+        stroke={color}
+        strokeWidth="1.5"
+      />
+      {dataPoints.map((p, i) => (
+        <circle key={i} cx={p[0].toFixed(1)} cy={p[1].toFixed(1)} r="3" fill={color} />
+      ))}
+      {LIVABILITY_LABELS.map((label, i) => {
+        const a = angles[i];
+        const d = r + 20;
+        const lx = cx + d * Math.cos(a);
+        const ly = cy + d * Math.sin(a);
+        return (
+          <text key={i} x={lx.toFixed(1)} y={ly.toFixed(1)} textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,.45)" fontSize="8" fontFamily="'DM Sans',sans-serif">
+            {label}
+          </text>
+        );
+      })}
+    </svg>
+  );
+}
+
+function LiveabilityRadar({ multiCities }) {
+  const cities = multiCities.slice(0, 4).map(id => CITY_DB.find(c => c.id === id)).filter(Boolean);
+
+  return (
+    <div style={{ maxWidth: "900px", margin: "0 auto" }}>
+      <div style={{ textAlign: "center", marginBottom: "16px" }}>
+        <div style={{ fontSize: "9px", letterSpacing: "3px", opacity: .3 }}>LIVABILITY RADAR · 8 DIMENSIONS (0–100)</div>
+      </div>
+      {cities.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "40px", opacity: .3 }}>Select cities in the Multi tab to view livability scores</div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "20px", justifyItems: "center" }}>
+          {cities.map(city => {
+            const scores = LIVABILITY[city.id] || Array(8).fill(50);
+            const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+            return (
+              <div key={city.id} style={{ textAlign: "center", padding: "16px", borderRadius: "12px", background: `${city.accent}06`, border: `1px solid ${city.accent}20` }}>
+                <div style={{ fontSize: "14px", fontWeight: 700, color: city.accent, marginBottom: "4px" }}>{city.flag} {city.name}</div>
+                <div style={{ fontSize: "9px", opacity: .4, marginBottom: "10px" }}>Livability avg: <span style={{ color: city.accent, fontWeight: 700 }}>{avg}/100</span></div>
+                <RadarChart scores={scores} color={city.accent} size={200} />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px", marginTop: "8px" }}>
+                  {LIVABILITY_LABELS.map((label, i) => (
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: "8px", padding: "1px 4px" }}>
+                      <span style={{ opacity: .4 }}>{label}</span>
+                      <span style={{ color: city.accent, fontWeight: 700 }}>{scores[i]}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HistoricalTrends({ multiCities }) {
+  const cities = multiCities.map(id => CITY_DB.find(c => c.id === id)).filter(Boolean);
+  const w = 560, h = 200;
+  const pad = { t: 20, r: 20, b: 30, l: 50 };
+  const chartW = w - pad.l - pad.r;
+  const chartH = h - pad.t - pad.b;
+
+  const allVals = cities.flatMap(c => HISTORY[c.id] || []);
+  const minY = allVals.length ? Math.min(...allVals) * 0.97 : 0;
+  const maxY = allVals.length ? Math.max(...allVals) * 1.03 : 10;
+
+  const xScale = (i) => pad.l + (i / (HISTORY_YEARS.length - 1)) * chartW;
+  const yScale = (v) => pad.t + chartH - ((v - minY) / (maxY - minY || 1)) * chartH;
+
+  return (
+    <div style={{ maxWidth: "900px", margin: "0 auto" }}>
+      <div style={{ textAlign: "center", marginBottom: "16px" }}>
+        <div style={{ fontSize: "9px", letterSpacing: "3px", opacity: .3 }}>POPULATION TRENDS · 2020–2024 (MILLIONS)</div>
+      </div>
+      {cities.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "40px", opacity: .3 }}>Select cities in the Multi tab to view population trends</div>
+      ) : (
+        <>
+          <div style={{ overflowX: "auto" }}>
+            <svg width={w} height={h} style={{ display: "block", margin: "0 auto" }}>
+              {[0, 0.25, 0.5, 0.75, 1].map(t => {
+                const y = pad.t + chartH * (1 - t);
+                const val = minY + t * (maxY - minY);
+                return (
+                  <g key={t}>
+                    <line x1={pad.l} y1={y} x2={pad.l + chartW} y2={y} stroke="rgba(255,255,255,.05)" />
+                    <text x={pad.l - 4} y={y} textAnchor="end" dominantBaseline="middle" fill="rgba(255,255,255,.25)" fontSize="8" fontFamily="'JetBrains Mono',monospace">{val.toFixed(1)}</text>
+                  </g>
+                );
+              })}
+              {HISTORY_YEARS.map((year, i) => (
+                <text key={year} x={xScale(i)} y={pad.t + chartH + 16} textAnchor="middle" fill="rgba(255,255,255,.3)" fontSize="8" fontFamily="'DM Sans'">{year}</text>
+              ))}
+              {cities.map(city => {
+                const data = HISTORY[city.id];
+                if (!data) return null;
+                const pts = data.map((v, i) => [xScale(i), yScale(v)]);
+                const pathD = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
+                const areaD = `${pathD} L ${xScale(data.length - 1).toFixed(1)} ${(pad.t + chartH).toFixed(1)} L ${xScale(0).toFixed(1)} ${(pad.t + chartH).toFixed(1)} Z`;
+                return (
+                  <g key={city.id}>
+                    <path d={areaD} fill={`${city.accent}12`} />
+                    <path d={pathD} fill="none" stroke={city.accent} strokeWidth="2" />
+                    {pts.map((p, i) => (
+                      <circle key={i} cx={p[0].toFixed(1)} cy={p[1].toFixed(1)} r="3" fill={city.accent} />
+                    ))}
+                    <text x={xScale(data.length - 1) + 4} y={yScale(data[data.length - 1])} dominantBaseline="middle" fill={city.accent} fontSize="8" fontFamily="'DM Sans'" fontWeight="700">{city.name}</text>
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "center", marginTop: "12px" }}>
+            {cities.map(city => {
+              const data = HISTORY[city.id] || [];
+              const growth = data.length >= 2 ? (((data[data.length - 1] - data[0]) / data[0]) * 100).toFixed(1) : "0";
+              return (
+                <div key={city.id} style={{ padding: "8px 12px", borderRadius: "8px", background: `${city.accent}08`, border: `1px solid ${city.accent}22`, fontSize: "9px", textAlign: "center" }}>
+                  <div style={{ color: city.accent, fontWeight: 700 }}>{city.flag} {city.name}</div>
+                  <div style={{ opacity: .5 }}>4yr growth: <span style={{ color: parseFloat(growth) >= 0 ? "#00E400" : "#FF4444", fontWeight: 700 }}>{growth > 0 ? "+" : ""}{growth}%</span></div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
 // MAIN APP
 // ══════════════════════════════════════════════════════════
 export default function LivePulse() {
@@ -367,8 +899,12 @@ export default function LivePulse() {
   const [city2Id, setCity2Id] = useState("toronto");
   const [tab, setTab] = useState("pulse");
   const [search, setSearch] = useState("");
-  const [selecting, setSelecting] = useState(null); // null | 1 | 2
+  const [selecting, setSelecting] = useState(null);
   const [showPro, setShowPro] = useState(false);
+  const [multiCities, setMultiCities] = useState(["dhaka", "toronto", "tokyo", "london", "nyc", "dubai"]);
+  const [waitlistEmail, setWaitlistEmail] = useState("");
+  const [waitlistJoined, setWaitlistJoined] = useState(() => !!localStorage.getItem("lp_waitlist_email"));
+  const [waitlistError, setWaitlistError] = useState("");
 
   const city1 = CITY_DB.find(c => c.id === city1Id);
   const city2 = CITY_DB.find(c => c.id === city2Id);
@@ -386,14 +922,38 @@ export default function LivePulse() {
     setSearch("");
   };
 
+  const toggleMultiCity = (id) => {
+    setMultiCities(prev => {
+      if (prev.includes(id)) return prev.filter(c => c !== id);
+      if (prev.length >= 6) return prev;
+      return [...prev, id];
+    });
+  };
+
+  const joinWaitlist = () => {
+    const email = waitlistEmail.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setWaitlistError("Please enter a valid email address.");
+      return;
+    }
+    localStorage.setItem("lp_waitlist_email", email);
+    setWaitlistJoined(true);
+    setWaitlistError("");
+  };
+
   const tabs = [
-    { id: "pulse", label: "🧠 Pulse" },
-    { id: "duel", label: "⚔️ Duel" },
-    { id: "oracle", label: "🔮 Oracle" },
+    { id: "pulse", label: "🧠 Pulse", pro: false },
+    { id: "duel", label: "⚔️ Duel", pro: false },
+    { id: "oracle", label: "🔮 Oracle", pro: false },
+    { id: "multi", label: "🏙️ Multi", pro: true },
+    { id: "costs", label: "💰 Costs", pro: true },
+    { id: "air", label: "🌬️ Air", pro: true },
+    { id: "radar", label: "📡 Radar", pro: true },
+    { id: "history", label: "📈 History", pro: true },
   ];
 
-  const PRO_FEATURES = ["Multi-city (40+ cities)", "Full cost of living data", "Air quality tracking", "Livability radar", "Historical trends", "API access"];
-  const FREE_FEATURES = ["2-city comparison", "Real-time clocks & heartbeats", "Emotional weather", "AI Oracle (5 queries/day)", "Time bridge"];
+  const FREE_FEATURES = ["2-city comparison", "Real-time clocks & heartbeats", "Emotional weather", "AI Oracle (unlimited)", "Time bridge"];
+  const PRO_FEATURES = ["Multi-city grid (up to 6 cities)", "Cost of living data", "Real-time air quality (AQI)", "Livability radar (8 dimensions)", "Population trend charts", "Early adopter pricing"];
 
   return (
     <div style={{ minHeight: "100vh", background: "#080808", color: "#e0e0e0", fontFamily: "'DM Sans',sans-serif" }}>
@@ -436,7 +996,7 @@ export default function LivePulse() {
       {selecting && (
         <div style={{ maxWidth: "500px", margin: "0 auto", padding: "0 16px 12px", animation: "fadeIn .3s" }}>
           <input type="text" value={search} onChange={e => setSearch(e.target.value)} autoFocus
-            placeholder="Search 40+ cities..." style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(255,255,255,.1)", background: "rgba(255,255,255,.04)", color: "#fff", fontSize: "13px", outline: "none", fontFamily: "'DM Sans'", marginBottom: "8px" }} />
+            placeholder="Search cities..." style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(255,255,255,.1)", background: "rgba(255,255,255,.04)", color: "#fff", fontSize: "13px", outline: "none", fontFamily: "'DM Sans'", marginBottom: "8px" }} />
           <div style={{ maxHeight: "250px", overflowY: "auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px" }}>
             {filtered.map(c => (
               <CityCard key={c.id} city={c} onSelect={selectCity} selected={c.id === (selecting === 1 ? city1Id : city2Id)} />
@@ -446,14 +1006,15 @@ export default function LivePulse() {
       )}
 
       {/* TABS */}
-      <div style={{ display: "flex", justifyContent: "center", gap: "4px", padding: "4px 14px 10px" }}>
+      <div style={{ display: "flex", justifyContent: "center", gap: "4px", padding: "4px 14px 10px", flexWrap: "wrap" }}>
         {tabs.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
-            padding: "6px 16px", borderRadius: "20px", fontSize: "11px", cursor: "pointer", fontFamily: "'DM Sans'", transition: "all .2s",
-            border: tab === t.id ? "1px solid rgba(255,255,255,.1)" : "1px solid rgba(255,255,255,.04)",
-            background: tab === t.id ? "rgba(255,255,255,.06)" : "transparent",
-            color: tab === t.id ? "#fff" : "#555", fontWeight: tab === t.id ? 700 : 400,
-          }}>{t.label}</button>
+            padding: "6px 12px", borderRadius: "20px", fontSize: "10px", cursor: "pointer", fontFamily: "'DM Sans'", transition: "all .2s",
+            border: tab === t.id ? `1px solid ${t.pro ? "#F7C94855" : "rgba(255,255,255,.1)"}` : `1px solid ${t.pro ? "#F7C94822" : "rgba(255,255,255,.04)"}`,
+            background: tab === t.id ? (t.pro ? "rgba(247,201,72,.1)" : "rgba(255,255,255,.06)") : "transparent",
+            color: tab === t.id ? (t.pro ? "#F7C948" : "#fff") : (t.pro ? "#F7C94866" : "#555"),
+            fontWeight: tab === t.id ? 700 : 400,
+          }}>{t.label}{t.pro ? " ⭐" : ""}</button>
         ))}
         <button onClick={() => setShowPro(!showPro)} style={{
           padding: "6px 14px", borderRadius: "20px", fontSize: "10px", cursor: "pointer", fontFamily: "'DM Sans'",
@@ -467,9 +1028,9 @@ export default function LivePulse() {
           <div style={{ textAlign: "center", marginBottom: "12px" }}>
             <div style={{ fontSize: "24px" }}>⭐</div>
             <div style={{ fontSize: "18px", fontWeight: 900, fontFamily: "'Playfair Display',serif", color: "#F7C948" }}>LivePulse Pro</div>
-            <div style={{ fontSize: "10px", opacity: .4 }}>Unlock the full city consciousness experience</div>
+            <div style={{ fontSize: "10px", opacity: .4 }}>All Pro features are live and free during our open beta</div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
             <div>
               <div style={{ fontSize: "9px", letterSpacing: "2px", opacity: .4, marginBottom: "6px" }}>FREE</div>
               {FREE_FEATURES.map(f => <div key={f} style={{ fontSize: "10px", opacity: .5, padding: "2px 0" }}>✓ {f}</div>)}
@@ -479,10 +1040,33 @@ export default function LivePulse() {
               {PRO_FEATURES.map(f => <div key={f} style={{ fontSize: "10px", color: "#F7C948", padding: "2px 0" }}>⭐ {f}</div>)}
             </div>
           </div>
-          <button style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "none", background: "linear-gradient(135deg, #F7C948, #FF6B35)", color: "#000", fontWeight: 700, fontSize: "13px", cursor: "pointer", fontFamily: "'DM Sans'" }}>
-            Coming Soon — Join Waitlist
-          </button>
-          <button onClick={() => setShowPro(false)} style={{ width: "100%", padding: "6px", border: "none", background: "none", color: "#666", fontSize: "10px", cursor: "pointer", marginTop: "6px", fontFamily: "'DM Sans'" }}>Close</button>
+
+          {waitlistJoined ? (
+            <div style={{ padding: "14px", borderRadius: "8px", background: "rgba(0,228,64,.08)", border: "1px solid rgba(0,228,64,.2)", textAlign: "center" }}>
+              <div style={{ fontSize: "20px", marginBottom: "4px" }}>🎉</div>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: "#00E440" }}>You're on the waitlist!</div>
+              <div style={{ fontSize: "10px", opacity: .5, marginTop: "4px" }}>We'll email {localStorage.getItem("lp_waitlist_email")} when Pro launches.</div>
+            </div>
+          ) : (
+            <div>
+              <div style={{ fontSize: "10px", opacity: .5, marginBottom: "8px", textAlign: "center" }}>Join the waitlist to lock in early adopter pricing ($5/mo)</div>
+              <div style={{ display: "flex", gap: "6px" }}>
+                <input
+                  type="email"
+                  value={waitlistEmail}
+                  onChange={e => { setWaitlistEmail(e.target.value); setWaitlistError(""); }}
+                  onKeyDown={e => e.key === "Enter" && joinWaitlist()}
+                  placeholder="your@email.com"
+                  style={{ flex: 1, padding: "10px 14px", borderRadius: "8px", border: `1px solid ${waitlistError ? "#FF4444" : "rgba(255,255,255,.1)"}`, background: "rgba(255,255,255,.04)", color: "#fff", fontSize: "13px", outline: "none", fontFamily: "'DM Sans'" }}
+                />
+                <button onClick={joinWaitlist} style={{ padding: "10px 16px", borderRadius: "8px", border: "none", background: "linear-gradient(135deg, #F7C948, #FF6B35)", color: "#000", fontWeight: 700, fontSize: "12px", cursor: "pointer", fontFamily: "'DM Sans'", whiteSpace: "nowrap" }}>
+                  Join Waitlist
+                </button>
+              </div>
+              {waitlistError && <div style={{ fontSize: "10px", color: "#FF4444", marginTop: "4px" }}>{waitlistError}</div>}
+            </div>
+          )}
+          <button onClick={() => setShowPro(false)} style={{ width: "100%", padding: "6px", border: "none", background: "none", color: "#666", fontSize: "10px", cursor: "pointer", marginTop: "10px", fontFamily: "'DM Sans'" }}>Close</button>
         </div>
       )}
 
@@ -499,11 +1083,36 @@ export default function LivePulse() {
         )}
         {tab === "duel" && <div style={{ animation: "slideUp .4s ease-out" }}><DuelView city1={city1} city2={city2} /></div>}
         {tab === "oracle" && <div style={{ animation: "slideUp .4s ease-out" }}><OracleChat city1={city1} city2={city2} /></div>}
+        {tab === "multi" && (
+          <div style={{ animation: "slideUp .4s ease-out" }}>
+            <MultiCityGrid multiCities={multiCities} onToggleCity={toggleMultiCity} />
+          </div>
+        )}
+        {tab === "costs" && (
+          <div style={{ animation: "slideUp .4s ease-out" }}>
+            <CostOfLivingPanel multiCities={multiCities} />
+          </div>
+        )}
+        {tab === "air" && (
+          <div style={{ animation: "slideUp .4s ease-out" }}>
+            <AirQualityPanel multiCities={multiCities} />
+          </div>
+        )}
+        {tab === "radar" && (
+          <div style={{ animation: "slideUp .4s ease-out" }}>
+            <LiveabilityRadar multiCities={multiCities} />
+          </div>
+        )}
+        {tab === "history" && (
+          <div style={{ animation: "slideUp .4s ease-out" }}>
+            <HistoricalTrends multiCities={multiCities} />
+          </div>
+        )}
       </div>
 
       {/* FOOTER */}
       <div style={{ textAlign: "center", padding: "14px", borderTop: "1px solid rgba(255,255,255,.03)" }}>
-        <div style={{ fontSize: "8px", letterSpacing: "2px", opacity: .08 }}>LIVEPULSE v3.0 · BUILT BY TAHSEEN · POWERED BY CLAUDE</div>
+        <div style={{ fontSize: "8px", letterSpacing: "2px", opacity: .08 }}>LIVEPULSE v3.1 · BUILT BY TAHSEEN · ORACLE POWERED BY OLLAMA</div>
       </div>
     </div>
   );
