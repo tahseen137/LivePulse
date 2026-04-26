@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 
 // ══════════════════════════════════════════════════════════
 // CITY DATABASE — 50+ global cities with real data
@@ -51,6 +51,147 @@ const LS = {
   set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
 
+// ══════════════════════════════════════════════════════════
+// COST OF LIVING — monthly estimates in USD
+// ══════════════════════════════════════════════════════════
+const COST_OF_LIVING = {
+  dhaka:         { rent: 300,  food: 150, transport: 30,  entertainment: 50  },
+  toronto:       { rent: 2200, food: 600, transport: 150, entertainment: 300 },
+  tokyo:         { rent: 1400, food: 500, transport: 120, entertainment: 250 },
+  london:        { rent: 2500, food: 700, transport: 180, entertainment: 350 },
+  nyc:           { rent: 3500, food: 800, transport: 130, entertainment: 400 },
+  dubai:         { rent: 2000, food: 500, transport: 100, entertainment: 350 },
+  singapore:     { rent: 2800, food: 600, transport: 100, entertainment: 300 },
+  mumbai:        { rent: 600,  food: 200, transport: 50,  entertainment: 100 },
+  istanbul:      { rent: 500,  food: 300, transport: 50,  entertainment: 150 },
+  seoul:         { rent: 1200, food: 400, transport: 100, entertainment: 200 },
+  bangkok:       { rent: 800,  food: 300, transport: 50,  entertainment: 150 },
+  paris:         { rent: 2200, food: 700, transport: 90,  entertainment: 350 },
+  berlin:        { rent: 1500, food: 500, transport: 100, entertainment: 250 },
+  sydney:        { rent: 2000, food: 600, transport: 150, entertainment: 300 },
+  lagos:         { rent: 700,  food: 300, transport: 80,  entertainment: 100 },
+  cairo:         { rent: 400,  food: 200, transport: 40,  entertainment: 80  },
+  mexico_city:   { rent: 700,  food: 300, transport: 50,  entertainment: 150 },
+  sao_paulo:     { rent: 900,  food: 350, transport: 70,  entertainment: 200 },
+  jakarta:       { rent: 600,  food: 250, transport: 50,  entertainment: 120 },
+  kuala_lumpur:  { rent: 700,  food: 300, transport: 60,  entertainment: 150 },
+  lisbon:        { rent: 1400, food: 500, transport: 80,  entertainment: 200 },
+  nairobi:       { rent: 600,  food: 300, transport: 60,  entertainment: 120 },
+  buenos_aires:  { rent: 700,  food: 300, transport: 50,  entertainment: 150 },
+  beijing:       { rent: 1200, food: 400, transport: 70,  entertainment: 200 },
+  moscow:        { rent: 800,  food: 400, transport: 60,  entertainment: 200 },
+  los_angeles:   { rent: 2800, food: 700, transport: 200, entertainment: 400 },
+  amsterdam:     { rent: 2000, food: 600, transport: 120, entertainment: 300 },
+  barcelona:     { rent: 1600, food: 550, transport: 100, entertainment: 280 },
+  cape_town:     { rent: 700,  food: 300, transport: 70,  entertainment: 150 },
+  hanoi:         { rent: 600,  food: 200, transport: 40,  entertainment: 100 },
+  lima:          { rent: 500,  food: 250, transport: 50,  entertainment: 120 },
+  manila:        { rent: 500,  food: 200, transport: 40,  entertainment: 100 },
+  taipei:        { rent: 900,  food: 350, transport: 80,  entertainment: 200 },
+  vienna:        { rent: 1500, food: 500, transport: 100, entertainment: 250 },
+  rome:          { rent: 1400, food: 550, transport: 100, entertainment: 250 },
+  san_francisco: { rent: 3600, food: 800, transport: 150, entertainment: 450 },
+  hong_kong:     { rent: 3000, food: 700, transport: 100, entertainment: 350 },
+  bogota:        { rent: 500,  food: 250, transport: 50,  entertainment: 120 },
+  warsaw:        { rent: 800,  food: 400, transport: 70,  entertainment: 180 },
+  stockholm:     { rent: 1700, food: 600, transport: 120, entertainment: 280 },
+};
+
+// ══════════════════════════════════════════════════════════
+// LIVABILITY SCORES — 8 dimensions [0-100]
+// Order: Safety, Affordability, Internet, Weather, Culture, Food, Transport, Nightlife
+// ══════════════════════════════════════════════════════════
+const LIVABILITY = {
+  dhaka:         [30, 90, 55, 45, 70, 80, 55, 40],
+  toronto:       [78, 35, 85, 45, 85, 85, 70, 70],
+  tokyo:         [92, 40, 95, 65, 95, 98, 95, 85],
+  london:        [72, 25, 88, 45, 95, 88, 85, 85],
+  nyc:           [60, 20, 82, 55, 98, 95, 75, 95],
+  dubai:         [88, 40, 85, 35, 70, 85, 70, 60],
+  singapore:     [95, 35, 95, 40, 80, 95, 97, 65],
+  mumbai:        [45, 75, 65, 40, 85, 90, 60, 55],
+  istanbul:      [55, 70, 72, 65, 90, 92, 65, 75],
+  seoul:         [88, 55, 98, 60, 90, 95, 92, 90],
+  bangkok:       [65, 75, 78, 35, 82, 92, 65, 88],
+  paris:         [65, 30, 85, 55, 98, 97, 85, 85],
+  berlin:        [72, 50, 80, 45, 92, 82, 88, 98],
+  sydney:        [80, 30, 78, 80, 82, 85, 72, 70],
+  lagos:         [30, 72, 45, 45, 75, 78, 35, 70],
+  cairo:         [40, 80, 55, 50, 85, 82, 50, 45],
+  mexico_city:   [40, 72, 70, 65, 88, 90, 65, 75],
+  sao_paulo:     [35, 65, 72, 55, 82, 88, 60, 80],
+  jakarta:       [45, 75, 68, 35, 75, 85, 55, 55],
+  kuala_lumpur:  [72, 72, 80, 40, 75, 90, 68, 62],
+  lisbon:        [82, 52, 78, 75, 88, 88, 70, 80],
+  nairobi:       [38, 70, 65, 68, 72, 72, 40, 60],
+  buenos_aires:  [45, 72, 72, 65, 88, 88, 68, 90],
+  beijing:       [78, 60, 55, 45, 90, 90, 85, 65],
+  moscow:        [55, 62, 80, 20, 90, 82, 82, 75],
+  los_angeles:   [52, 22, 88, 85, 88, 90, 40, 80],
+  amsterdam:     [78, 38, 90, 45, 88, 82, 88, 85],
+  barcelona:     [62, 45, 85, 78, 92, 95, 80, 95],
+  cape_town:     [38, 70, 68, 80, 78, 80, 50, 68],
+  hanoi:         [70, 80, 72, 45, 80, 88, 55, 60],
+  lima:          [42, 72, 65, 55, 75, 85, 55, 62],
+  manila:        [40, 75, 65, 35, 72, 82, 45, 65],
+  taipei:        [90, 60, 95, 55, 85, 95, 90, 72],
+  vienna:        [88, 42, 88, 52, 95, 88, 90, 72],
+  rome:          [65, 45, 78, 72, 98, 97, 65, 80],
+  san_francisco: [48, 15, 92, 72, 88, 92, 65, 72],
+  hong_kong:     [88, 28, 92, 45, 88, 95, 95, 80],
+  bogota:        [38, 72, 70, 62, 78, 80, 58, 68],
+  warsaw:        [78, 62, 88, 35, 82, 82, 80, 75],
+  stockholm:     [85, 32, 92, 35, 88, 82, 85, 68],
+};
+const LIVABILITY_LABELS = ["Safety", "Affordability", "Internet", "Weather", "Culture", "Food", "Transport", "Nightlife"];
+
+// ══════════════════════════════════════════════════════════
+// HISTORICAL POPULATION TRENDS — millions, 2020–2024
+// ══════════════════════════════════════════════════════════
+const HISTORY = {
+  dhaka:         [21.0, 21.5, 21.9, 22.2, 22.4],
+  toronto:       [2.73, 2.76, 2.80, 2.85, 2.93],
+  tokyo:         [13.96, 13.96, 13.95, 13.94, 13.92],
+  london:        [8.80, 8.82, 8.85, 8.87, 8.90],
+  nyc:           [8.34, 8.34, 8.34, 8.34, 8.34],
+  dubai:         [3.30, 3.40, 3.50, 3.55, 3.60],
+  singapore:     [5.69, 5.45, 5.64, 5.83, 5.92],
+  mumbai:        [20.4, 20.5, 20.7, 20.9, 21.0],
+  istanbul:      [15.0, 15.2, 15.4, 15.6, 15.8],
+  seoul:         [9.73, 9.72, 9.72, 9.71, 9.70],
+  bangkok:       [10.5, 10.6, 10.6, 10.7, 10.7],
+  paris:         [2.16, 2.17, 2.17, 2.18, 2.20],
+  berlin:        [3.64, 3.66, 3.68, 3.70, 3.71],
+  sydney:        [5.13, 5.23, 5.25, 5.28, 5.31],
+  lagos:         [15.3, 15.7, 16.0, 16.3, 16.6],
+  cairo:         [9.85, 9.90, 9.95, 10.0, 10.1],
+  mexico_city:   [8.96, 9.00, 9.05, 9.10, 9.20],
+  sao_paulo:     [12.1, 12.2, 12.2, 12.2, 12.3],
+  jakarta:       [10.5, 10.5, 10.6, 10.6, 10.6],
+  kuala_lumpur:  [1.73, 1.75, 1.76, 1.78, 1.80],
+  lisbon:        [0.505, 0.506, 0.507, 0.510, 0.513],
+  nairobi:       [4.4, 4.5, 4.5, 4.6, 4.7],
+  buenos_aires:  [3.05, 3.07, 3.08, 3.09, 3.10],
+  beijing:       [21.5, 21.5, 21.6, 21.6, 21.7],
+  moscow:        [12.5, 12.5, 12.6, 12.6, 12.6],
+  los_angeles:   [3.87, 3.88, 3.89, 3.90, 3.90],
+  amsterdam:     [0.87, 0.88, 0.88, 0.89, 0.90],
+  barcelona:     [1.61, 1.62, 1.62, 1.63, 1.63],
+  cape_town:     [4.6, 4.7, 4.7, 4.8, 4.8],
+  hanoi:         [8.0, 8.1, 8.2, 8.3, 8.4],
+  lima:          [9.75, 9.82, 9.88, 9.93, 10.0],
+  manila:        [1.78, 1.79, 1.80, 1.80, 1.80],
+  taipei:        [2.62, 2.63, 2.63, 2.64, 2.64],
+  vienna:        [1.88, 1.89, 1.90, 1.90, 1.92],
+  rome:          [2.80, 2.80, 2.80, 2.80, 2.82],
+  san_francisco: [0.874, 0.880, 0.880, 0.888, 0.900],
+  hong_kong:     [7.48, 7.41, 7.43, 7.47, 7.50],
+  bogota:        [7.08, 7.15, 7.18, 7.20, 7.24],
+  warsaw:        [1.77, 1.78, 1.79, 1.80, 1.80],
+  stockholm:     [0.970, 0.972, 0.974, 0.977, 0.980],
+};
+const HISTORY_YEARS = [2020, 2021, 2022, 2023, 2024];
+
 // ── Feature 7: Filter config ───────────────────────────────
 const CONTINENT_FILTERS = ["Africa", "Asia", "Europe", "North America", "South America", "Oceania"];
 const UTC_RANGES = [
@@ -100,6 +241,26 @@ function getHourlyBPM(city, hour) {
 function getMoodColor(mood) {
   const map = { Dreaming: "#4A90D9", Restless: "#E63946", Awakening: "#F7C948", Surging: "#FF6B35", Contemplative: "#8EC5FC", Focused: "#4A90D9", Electrified: "#FF6B35", Vibrant: "#F7C948", Relaxed: "#8EC5FC" };
   return map[mood] || "#888";
+}
+
+function getAqiColor(aqi) {
+  if (!aqi) return "#888";
+  if (aqi <= 50) return "#00E400";
+  if (aqi <= 100) return "#FFFF00";
+  if (aqi <= 150) return "#FF7E00";
+  if (aqi <= 200) return "#FF0000";
+  if (aqi <= 300) return "#8F3F97";
+  return "#7E0023";
+}
+
+function getAqiLabel(aqi) {
+  if (!aqi) return "No data";
+  if (aqi <= 50) return "Good";
+  if (aqi <= 100) return "Moderate";
+  if (aqi <= 150) return "Unhealthy (Sensitive)";
+  if (aqi <= 200) return "Unhealthy";
+  if (aqi <= 300) return "Very Unhealthy";
+  return "Hazardous";
 }
 
 // ══════════════════════════════════════════════════════════
@@ -478,70 +639,74 @@ function TimeBridge({ city1, city2, city3 }) {
   );
 }
 
-// ── Feature 8: OracleChat supports optional 3rd city ──────
-function OracleChat({ city1, city2, city3, isPro, onUpgrade }) {
+// ── Oracle — powered by local Ollama gemma4 ───────────────
+function OracleChat({ city1, city2, city3 }) {
   const pairKey = `livepulse_oracle_${[city1.id, city2.id, city3?.id].filter(Boolean).sort().join("_")}`;
   const [q, setQ] = useState("");
   const [ans, setAns] = useState("");
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState(() => LS.get(pairKey, []));
-  const [remaining, setRemaining] = useState(null); // null = unknown (pro or first visit)
-  const [rateLimited, setRateLimited] = useState(false);
-
-  const DAILY_FREE_LIMIT = 5;
 
   useEffect(() => {
     setHistory(LS.get(pairKey, []));
-    setAns(""); setRateLimited(false);
+    setAns("");
   }, [pairKey]);
 
   const ask = async () => {
-    if (!q.trim() || loading || rateLimited) return;
-    setLoading(true); setAns(""); setRateLimited(false);
+    if (!q.trim() || loading) return;
+    setLoading(true); setAns("");
     const question = q; setQ("");
+
+    const cityList = [city1, city2, city3].filter(Boolean);
+    const cityContext = cityList.map(c =>
+      `${c.name}, ${c.country}: Pop ${c.pop}, Density ${c.density}, Currency ${c.currency}, Language ${c.lang}, TZ ${c.tz}`
+    ).join("\n");
+
+    const systemPrompt = `You are "The Oracle" of LivePulse — an AI with deep awareness of cities worldwide. Today: ${new Date().toLocaleDateString()}. Answer queries about cities with poetic flair but grounded in specific data. Keep responses to 2-4 sentences.`;
+
+    const messages = [
+      { role: "system", content: systemPrompt },
+      ...history.flatMap(h => [
+        { role: "user", content: h.q },
+        { role: "assistant", content: h.a },
+      ]),
+      { role: "user", content: `Cities:\n${cityContext}\n\nQuestion: ${question}` },
+    ];
+
     try {
-      const res = await fetch("/api/oracle", {
+      const res = await fetch("http://localhost:11434/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          question,
-          city1: { name: city1.name, country: city1.country, pop: city1.pop, density: city1.density, currency: city1.currency, lang: city1.lang, tz: city1.tz },
-          city2: { name: city2.name, country: city2.country, pop: city2.pop, density: city2.density, currency: city2.currency, lang: city2.lang, tz: city2.tz },
-          ...(city3 ? { city3: { name: city3.name, country: city3.country, pop: city3.pop, density: city3.density, currency: city3.currency, lang: city3.lang, tz: city3.tz } } : {}),
+          model: "gemma4",
+          messages,
+          stream: false,
+          options: { temperature: 0.7, num_predict: 400 },
         }),
       });
-      if (res.status === 429) {
-        setRateLimited(true);
-        setRemaining(0);
-        setLoading(false);
-        return;
-      }
+      if (!res.ok) throw new Error(`Ollama ${res.status}`);
       const data = await res.json();
-      if (data._remaining !== undefined && data._remaining !== null) setRemaining(data._remaining);
-      const text = data.content?.map(c => c.text || "").join("") || "The Oracle meditates...";
+      const text = data.message?.content || "The Oracle meditates in silence...";
       setAns(text);
       setHistory(h => {
         const next = [...h, { q: question, a: text }].slice(-20);
         LS.set(pairKey, next);
         return next;
       });
-    } catch { setAns("Connection disrupted. Try again."); }
+    } catch {
+      setAns("The Oracle is offline. Start Ollama locally (run: ollama serve) then try again.");
+    }
     setLoading(false);
   };
 
-  const clearHistory = () => {
-    setHistory([]);
-    LS.set(pairKey, []);
-    setAns("");
-  };
-
+  const clearHistory = () => { setHistory([]); LS.set(pairKey, []); setAns(""); };
 
   return (
     <div style={{ maxWidth: "680px", margin: "0 auto" }}>
       <div style={{ textAlign: "center", marginBottom: "16px" }}>
         <div style={{ fontSize: "40px", animation: "float 3s ease-in-out infinite" }}>🔮</div>
         <h2 style={{ fontSize: "18px", fontWeight: 900, fontFamily: "'Playfair Display',serif", margin: "4px 0 2px" }}>The Oracle</h2>
-        <div style={{ fontSize: "9px", opacity: .25 }}>AI intelligence comparing {city3 ? `${city1.name}, ${city2.name} and ${city3.name}` : `${city1.name} and ${city2.name}`}</div>
+        <div style={{ fontSize: "9px", opacity: .25 }}>Local AI · {city3 ? `${city1.name}, ${city2.name} & ${city3.name}` : `${city1.name} & ${city2.name}`} · powered by Ollama gemma4</div>
       </div>
       {history.length > 0 && (
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "6px" }}>
@@ -556,33 +721,18 @@ function OracleChat({ city1, city2, city3, isPro, onUpgrade }) {
       ))}
       <div style={{ display: "flex", gap: "6px" }}>
         <input type="text" value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === "Enter" && ask()}
-          placeholder={rateLimited ? "Daily limit reached — upgrade to continue" : `Ask about ${city1.name} or ${city2.name}...`}
-          disabled={rateLimited}
-          style={{ flex: 1, padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(255,255,255,.08)", background: rateLimited ? "rgba(255,255,255,.01)" : "rgba(255,255,255,.03)", color: "#fff", fontSize: "13px", outline: "none", fontFamily: "'DM Sans'", opacity: rateLimited ? .5 : 1 }} />
-        <button onClick={ask} disabled={loading || rateLimited} style={{ padding: "10px 18px", borderRadius: "8px", border: "none", background: `linear-gradient(135deg, ${city1.accent}, ${city2.accent})`, color: "#fff", fontWeight: 700, cursor: (loading || rateLimited) ? "not-allowed" : "pointer", fontSize: "13px", fontFamily: "'DM Sans'", opacity: (loading || rateLimited) ? .4 : 1 }}>
+          placeholder={`Ask about ${city1.name} or ${city2.name}...`}
+          style={{ flex: 1, padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(255,255,255,.08)", background: "rgba(255,255,255,.03)", color: "#fff", fontSize: "13px", outline: "none", fontFamily: "'DM Sans'" }} />
+        <button onClick={ask} disabled={loading} style={{ padding: "10px 18px", borderRadius: "8px", border: "none", background: `linear-gradient(135deg, ${city1.accent}, ${city2.accent})`, color: "#fff", fontWeight: 700, cursor: loading ? "wait" : "pointer", fontSize: "13px", fontFamily: "'DM Sans'", opacity: loading ? .5 : 1 }}>
           {loading ? "⏳" : "Ask"}
         </button>
       </div>
-      {!isPro && remaining !== null && !rateLimited && (
-        <div style={{ fontSize: "9px", opacity: .3, textAlign: "center", marginTop: "5px" }}>
-          {remaining} of {DAILY_FREE_LIMIT} free queries remaining today
-        </div>
-      )}
-      {rateLimited && (
-        <div style={{ marginTop: "14px", padding: "16px", borderRadius: "10px", background: "rgba(247,201,72,.06)", border: "1px solid rgba(247,201,72,.2)", textAlign: "center" }}>
-          <div style={{ fontSize: "13px", fontWeight: 700, color: "#F7C948", marginBottom: "4px" }}>Daily limit reached</div>
-          <div style={{ fontSize: "10px", opacity: .5, marginBottom: "12px" }}>You've used all {DAILY_FREE_LIMIT} free Oracle queries for today. Resets at midnight.</div>
-          <button onClick={onUpgrade} style={{ padding: "8px 20px", borderRadius: "8px", border: "none", background: "linear-gradient(135deg, #F7C948, #FF6B35)", color: "#000", fontWeight: 700, fontSize: "12px", cursor: "pointer", fontFamily: "'DM Sans'" }}>
-            ⭐ Upgrade to Pro — Unlimited Queries
-          </button>
-        </div>
-      )}
       {ans && !history.find(h => h.a === ans) && (
         <div style={{ marginTop: "8px", padding: "12px", borderRadius: "8px", background: `linear-gradient(135deg, ${city1.accent}08, ${city2.accent}08)`, borderLeft: "3px solid rgba(255,255,255,.1)", fontStyle: "italic", fontSize: "13px", lineHeight: 1.6, fontFamily: "'Playfair Display',serif" }}>{ans}</div>
       )}
       <div style={{ marginTop: "10px", display: "flex", gap: "4px", flexWrap: "wrap", justifyContent: "center" }}>
         {["Which is safer?", "Best food?", "Cost comparison?", "Better for remote work?", "Which never sleeps?"].map(s => (
-          <button key={s} onClick={() => !rateLimited && setQ(s)} style={{ padding: "4px 10px", borderRadius: "16px", border: "1px solid rgba(255,255,255,.05)", background: "rgba(255,255,255,.02)", color: rateLimited ? "#333" : "#555", fontSize: "9px", cursor: rateLimited ? "default" : "pointer", fontFamily: "'DM Sans'" }}>{s}</button>
+          <button key={s} onClick={() => setQ(s)} style={{ padding: "4px 10px", borderRadius: "16px", border: "1px solid rgba(255,255,255,.05)", background: "rgba(255,255,255,.02)", color: "#555", fontSize: "9px", cursor: "pointer", fontFamily: "'DM Sans'" }}>{s}</button>
         ))}
       </div>
     </div>
@@ -723,6 +873,286 @@ function ShareCard({ city1, city2, url, onClose }) {
 }
 
 // ══════════════════════════════════════════════════════════
+// PRO COMPONENTS
+// ══════════════════════════════════════════════════════════
+
+function MultiCityGrid({ multiCities, onToggleCity }) {
+  const cities = multiCities.map(id => CITY_DB.find(c => c.id === id)).filter(Boolean);
+  return (
+    <div>
+      <div style={{ marginBottom: "12px" }}>
+        <div style={{ fontSize: "8px", letterSpacing: "2px", opacity: .3, marginBottom: "8px", textAlign: "center" }}>SELECT CITIES (MAX 6)</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", justifyContent: "center", maxHeight: "140px", overflowY: "auto" }}>
+          {CITY_DB.map(c => {
+            const active = multiCities.includes(c.id);
+            return (
+              <button key={c.id} onClick={() => onToggleCity(c.id)} style={{
+                padding: "4px 8px", borderRadius: "16px", fontSize: "10px", cursor: "pointer", fontFamily: "'DM Sans'",
+                border: active ? `1px solid ${c.accent}` : "1px solid rgba(255,255,255,.06)",
+                background: active ? `${c.accent}22` : "rgba(255,255,255,.02)",
+                color: active ? c.accent : "#555", transition: "all .15s",
+              }}>
+                {c.flag} {c.name}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "10px" }}>
+        {cities.map(city => <CityPulse key={city.id} city={city} />)}
+      </div>
+      {cities.length === 0 && <div style={{ textAlign: "center", padding: "40px", opacity: .3 }}>Select cities above to compare them side by side</div>}
+    </div>
+  );
+}
+
+function CostOfLivingPanel({ multiCities }) {
+  const cities = multiCities.map(id => CITY_DB.find(c => c.id === id)).filter(Boolean);
+  const cats = [
+    { key: "rent", label: "🏠 Rent", color: "#4A90D9" },
+    { key: "food", label: "🍜 Food", color: "#FF9933" },
+    { key: "transport", label: "🚇 Transport", color: "#00843D" },
+    { key: "entertainment", label: "🎭 Entertainment", color: "#A50044" },
+  ];
+  if (cities.length === 0) return <div style={{ textAlign: "center", padding: "40px", opacity: .3 }}>Select cities in the Multi tab to compare costs</div>;
+  const maxVals = cats.reduce((acc, cat) => {
+    acc[cat.key] = Math.max(...cities.map(c => COST_OF_LIVING[c.id]?.[cat.key] || 0)) || 1;
+    return acc;
+  }, {});
+  return (
+    <div style={{ maxWidth: "900px", margin: "0 auto" }}>
+      <div style={{ textAlign: "center", marginBottom: "16px" }}>
+        <div style={{ fontSize: "9px", letterSpacing: "3px", opacity: .3 }}>MONTHLY COST OF LIVING · USD ESTIMATES</div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: `140px repeat(${cities.length}, 1fr)`, gap: "6px", marginBottom: "8px" }}>
+        <div />
+        {cities.map(c => <div key={c.id} style={{ textAlign: "center", fontSize: "11px", fontWeight: 700, color: c.accent }}>{c.flag} {c.name}</div>)}
+      </div>
+      {cats.map(cat => (
+        <div key={cat.key} style={{ marginBottom: "12px" }}>
+          <div style={{ fontSize: "9px", opacity: .4, marginBottom: "4px" }}>{cat.label}</div>
+          <div style={{ display: "grid", gridTemplateColumns: `140px repeat(${cities.length}, 1fr)`, gap: "6px", alignItems: "center" }}>
+            <div />
+            {cities.map(c => {
+              const val = COST_OF_LIVING[c.id]?.[cat.key] || 0;
+              return (
+                <div key={c.id}>
+                  <div style={{ fontSize: "10px", fontWeight: 700, color: c.accent, marginBottom: "2px" }}>${val}/mo</div>
+                  <div style={{ height: "4px", borderRadius: "2px", background: "rgba(255,255,255,.05)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${(val / maxVals[cat.key]) * 100}%`, borderRadius: "2px", background: cat.color, opacity: .8 }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+      <div style={{ marginTop: "16px", padding: "12px", borderRadius: "8px", background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.04)" }}>
+        <div style={{ fontSize: "8px", letterSpacing: "2px", opacity: .3, marginBottom: "8px" }}>💰 MONTHLY TOTAL</div>
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${cities.length}, 1fr)`, gap: "8px" }}>
+          {cities.map(c => {
+            const col = COST_OF_LIVING[c.id] || {};
+            const total = (col.rent || 0) + (col.food || 0) + (col.transport || 0) + (col.entertainment || 0);
+            return (
+              <div key={c.id} style={{ textAlign: "center", padding: "10px", borderRadius: "8px", background: `${c.accent}08`, border: `1px solid ${c.accent}22` }}>
+                <div style={{ fontSize: "10px", opacity: .5 }}>{c.flag} {c.name}</div>
+                <div style={{ fontSize: "20px", fontWeight: 900, color: c.accent, fontFamily: "'JetBrains Mono',monospace" }}>${total.toLocaleString()}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AirQualityPanel({ multiCities }) {
+  const [airData, setAirData] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [lastFetch, setLastFetch] = useState(null);
+  const cities = multiCities.map(id => CITY_DB.find(c => c.id === id)).filter(Boolean);
+  const cityKey = multiCities.join(",");
+
+  const fetchAirData = useCallback(async () => {
+    if (cities.length === 0) return;
+    setLoading(true);
+    const results = await Promise.all(
+      cities.map(async city => {
+        try {
+          const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${city.lat}&longitude=${city.lng}&current=pm2_5,pm10,us_aqi&timezone=auto`;
+          const res = await fetch(url);
+          const data = await res.json();
+          return { id: city.id, pm25: data.current?.pm2_5, pm10: data.current?.pm10, aqi: data.current?.us_aqi };
+        } catch {
+          return { id: city.id, pm25: null, pm10: null, aqi: null };
+        }
+      })
+    );
+    const map = {};
+    results.forEach(r => { map[r.id] = r; });
+    setAirData(map);
+    setLastFetch(new Date());
+    setLoading(false);
+  }, [cityKey]);
+
+  useEffect(() => { fetchAirData(); }, [fetchAirData]);
+
+  if (cities.length === 0) return <div style={{ textAlign: "center", padding: "40px", opacity: .3 }}>Select cities in the Multi tab to view air quality</div>;
+
+  return (
+    <div style={{ maxWidth: "900px", margin: "0 auto" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+        <div style={{ fontSize: "9px", letterSpacing: "3px", opacity: .3 }}>REAL-TIME AIR QUALITY · OPEN-METEO</div>
+        <button onClick={fetchAirData} disabled={loading} style={{ padding: "4px 12px", borderRadius: "16px", border: "1px solid rgba(255,255,255,.1)", background: "rgba(255,255,255,.03)", color: "#888", fontSize: "9px", cursor: "pointer", fontFamily: "'DM Sans'" }}>
+          {loading ? "⏳ Loading..." : "↻ Refresh"}
+        </button>
+      </div>
+      {lastFetch && <div style={{ fontSize: "8px", opacity: .2, textAlign: "right", marginBottom: "10px" }}>Updated: {lastFetch.toLocaleTimeString()}</div>}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "10px" }}>
+        {cities.map(city => {
+          const d = airData[city.id];
+          const aqi = d?.aqi;
+          const aqiColor = getAqiColor(aqi);
+          return (
+            <div key={city.id} style={{ padding: "16px", borderRadius: "12px", background: `${city.accent}08`, border: `1px solid ${city.accent}22`, textAlign: "center" }}>
+              <div style={{ fontSize: "20px", marginBottom: "4px" }}>{city.flag}</div>
+              <div style={{ fontSize: "12px", fontWeight: 700, color: city.accent, marginBottom: "8px" }}>{city.name}</div>
+              {loading && !d ? (
+                <div style={{ opacity: .3, fontSize: "10px" }}>Fetching...</div>
+              ) : (
+                <>
+                  <div style={{ fontSize: "32px", fontWeight: 900, fontFamily: "'JetBrains Mono',monospace", color: aqiColor, marginBottom: "2px" }}>{aqi ?? "—"}</div>
+                  <div style={{ fontSize: "8px", color: aqiColor, fontWeight: 700, marginBottom: "8px" }}>{getAqiLabel(aqi)}</div>
+                  <div style={{ display: "flex", justifyContent: "space-around", fontSize: "9px", opacity: .6 }}>
+                    <span>PM2.5: <b>{d?.pm25?.toFixed(1) ?? "—"}</b></span>
+                    <span>PM10: <b>{d?.pm10?.toFixed(1) ?? "—"}</b></span>
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ marginTop: "16px", display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "center" }}>
+        {[["0–50","Good","#00E400"],["51–100","Moderate","#FFFF00"],["101–150","Unhealthy (Sensitive)","#FF7E00"],["151–200","Unhealthy","#FF0000"],["201+","Very Unhealthy+","#8F3F97"]].map(([range, label, color]) => (
+          <div key={range} style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "8px", opacity: .6 }}>
+            <div style={{ width: "8px", height: "8px", borderRadius: "2px", background: color }} />
+            <span>{range} {label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RadarChart({ scores, color, size = 200 }) {
+  const n = LIVABILITY_LABELS.length;
+  const cx = size / 2, cy = size / 2, r = size * 0.36;
+  const angles = Array.from({ length: n }, (_, i) => (i * 2 * Math.PI / n) - Math.PI / 2);
+  const gridPts = level => angles.map(a => { const d = (level / 100) * r; return `${(cx + d * Math.cos(a)).toFixed(1)},${(cy + d * Math.sin(a)).toFixed(1)}`; }).join(" ");
+  const dataPts = scores.map((val, i) => { const a = angles[i]; const d = (val / 100) * r; return [cx + d * Math.cos(a), cy + d * Math.sin(a)]; });
+  return (
+    <svg width={size} height={size} style={{ overflow: "visible" }}>
+      {[25, 50, 75, 100].map(level => <polygon key={level} points={gridPts(level)} fill="none" stroke="rgba(255,255,255,.05)" strokeWidth="1" />)}
+      {angles.map((a, i) => <line key={i} x1={cx} y1={cy} x2={(cx + r * Math.cos(a)).toFixed(1)} y2={(cy + r * Math.sin(a)).toFixed(1)} stroke="rgba(255,255,255,.07)" strokeWidth="1" />)}
+      <polygon points={dataPts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ")} fill={`${color}28`} stroke={color} strokeWidth="1.5" />
+      {dataPts.map((p, i) => <circle key={i} cx={p[0].toFixed(1)} cy={p[1].toFixed(1)} r="3" fill={color} />)}
+      {LIVABILITY_LABELS.map((label, i) => {
+        const a = angles[i]; const d = r + 20;
+        return <text key={i} x={(cx + d * Math.cos(a)).toFixed(1)} y={(cy + d * Math.sin(a)).toFixed(1)} textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,.45)" fontSize="8" fontFamily="'DM Sans',sans-serif">{label}</text>;
+      })}
+    </svg>
+  );
+}
+
+function LiveabilityRadar({ multiCities }) {
+  const cities = multiCities.slice(0, 4).map(id => CITY_DB.find(c => c.id === id)).filter(Boolean);
+  if (cities.length === 0) return <div style={{ textAlign: "center", padding: "40px", opacity: .3 }}>Select cities in the Multi tab to view livability scores</div>;
+  return (
+    <div style={{ maxWidth: "900px", margin: "0 auto" }}>
+      <div style={{ textAlign: "center", marginBottom: "16px" }}>
+        <div style={{ fontSize: "9px", letterSpacing: "3px", opacity: .3 }}>LIVABILITY RADAR · 8 DIMENSIONS (0–100) · FIRST 4 CITIES</div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "20px", justifyItems: "center" }}>
+        {cities.map(city => {
+          const scores = LIVABILITY[city.id] || Array(8).fill(50);
+          const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+          return (
+            <div key={city.id} style={{ textAlign: "center", padding: "16px", borderRadius: "12px", background: `${city.accent}06`, border: `1px solid ${city.accent}20` }}>
+              <div style={{ fontSize: "14px", fontWeight: 700, color: city.accent, marginBottom: "4px" }}>{city.flag} {city.name}</div>
+              <div style={{ fontSize: "9px", opacity: .4, marginBottom: "10px" }}>Avg: <span style={{ color: city.accent, fontWeight: 700 }}>{avg}/100</span></div>
+              <RadarChart scores={scores} color={city.accent} size={200} />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px", marginTop: "8px" }}>
+                {LIVABILITY_LABELS.map((label, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: "8px", padding: "1px 4px" }}>
+                    <span style={{ opacity: .4 }}>{label}</span>
+                    <span style={{ color: city.accent, fontWeight: 700 }}>{scores[i]}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function HistoricalTrends({ multiCities }) {
+  const cities = multiCities.map(id => CITY_DB.find(c => c.id === id)).filter(Boolean);
+  const w = 560, h = 200;
+  const pad = { t: 20, r: 20, b: 30, l: 50 };
+  const chartW = w - pad.l - pad.r, chartH = h - pad.t - pad.b;
+  const allVals = cities.flatMap(c => HISTORY[c.id] || []);
+  const minY = allVals.length ? Math.min(...allVals) * 0.97 : 0;
+  const maxY = allVals.length ? Math.max(...allVals) * 1.03 : 10;
+  const xScale = i => pad.l + (i / (HISTORY_YEARS.length - 1)) * chartW;
+  const yScale = v => pad.t + chartH - ((v - minY) / (maxY - minY || 1)) * chartH;
+  if (cities.length === 0) return <div style={{ textAlign: "center", padding: "40px", opacity: .3 }}>Select cities in the Multi tab to view population trends</div>;
+  return (
+    <div style={{ maxWidth: "900px", margin: "0 auto" }}>
+      <div style={{ textAlign: "center", marginBottom: "16px" }}>
+        <div style={{ fontSize: "9px", letterSpacing: "3px", opacity: .3 }}>POPULATION TRENDS · 2020–2024 (MILLIONS)</div>
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <svg width={w} height={h} style={{ display: "block", margin: "0 auto" }}>
+          {[0, 0.25, 0.5, 0.75, 1].map(t => {
+            const y = pad.t + chartH * (1 - t); const val = minY + t * (maxY - minY);
+            return <g key={t}><line x1={pad.l} y1={y} x2={pad.l + chartW} y2={y} stroke="rgba(255,255,255,.05)" /><text x={pad.l - 4} y={y} textAnchor="end" dominantBaseline="middle" fill="rgba(255,255,255,.25)" fontSize="8" fontFamily="'JetBrains Mono',monospace">{val.toFixed(1)}</text></g>;
+          })}
+          {HISTORY_YEARS.map((year, i) => <text key={year} x={xScale(i)} y={pad.t + chartH + 16} textAnchor="middle" fill="rgba(255,255,255,.3)" fontSize="8" fontFamily="'DM Sans'">{year}</text>)}
+          {cities.map(city => {
+            const data = HISTORY[city.id]; if (!data) return null;
+            const pts = data.map((v, i) => [xScale(i), yScale(v)]);
+            const pathD = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
+            return (
+              <g key={city.id}>
+                <path d={`${pathD} L ${xScale(data.length - 1).toFixed(1)} ${(pad.t + chartH).toFixed(1)} L ${xScale(0).toFixed(1)} ${(pad.t + chartH).toFixed(1)} Z`} fill={`${city.accent}12`} />
+                <path d={pathD} fill="none" stroke={city.accent} strokeWidth="2" />
+                {pts.map((p, i) => <circle key={i} cx={p[0].toFixed(1)} cy={p[1].toFixed(1)} r="3" fill={city.accent} />)}
+                <text x={xScale(data.length - 1) + 4} y={yScale(data[data.length - 1])} dominantBaseline="middle" fill={city.accent} fontSize="8" fontFamily="'DM Sans'" fontWeight="700">{city.name}</text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "center", marginTop: "12px" }}>
+        {cities.map(city => {
+          const data = HISTORY[city.id] || [];
+          const growth = data.length >= 2 ? (((data[data.length - 1] - data[0]) / data[0]) * 100).toFixed(1) : "0";
+          return (
+            <div key={city.id} style={{ padding: "8px 12px", borderRadius: "8px", background: `${city.accent}08`, border: `1px solid ${city.accent}22`, fontSize: "9px", textAlign: "center" }}>
+              <div style={{ color: city.accent, fontWeight: 700 }}>{city.flag} {city.name}</div>
+              <div style={{ opacity: .5 }}>4yr growth: <span style={{ color: parseFloat(growth) >= 0 ? "#00E400" : "#FF4444", fontWeight: 700 }}>{growth > 0 ? "+" : ""}{growth}%</span></div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
 // MAIN APP
 // ══════════════════════════════════════════════════════════
 export default function LivePulse() {
@@ -749,6 +1179,10 @@ export default function LivePulse() {
   const [isPro, setIsPro] = useState(() => localStorage.getItem("lp_pro") === "true");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [proActivated, setProActivated] = useState(false);
+  const [multiCities, setMultiCities] = useState(["dhaka", "toronto", "tokyo", "london", "nyc", "dubai"]);
+  const [waitlistEmail, setWaitlistEmail] = useState("");
+  const [waitlistJoined, setWaitlistJoined] = useState(() => !!localStorage.getItem("lp_waitlist_email"));
+  const [waitlistError, setWaitlistError] = useState("");
 
   // After Stripe redirects back with ?pro_session=<id>, verify and activate Pro
   useEffect(() => {
@@ -859,15 +1293,39 @@ export default function LivePulse() {
     });
   };
 
+  const toggleMultiCity = (id) => {
+    setMultiCities(prev => {
+      if (prev.includes(id)) return prev.filter(c => c !== id);
+      if (prev.length >= 6) return prev;
+      return [...prev, id];
+    });
+  };
+
+  const joinWaitlist = () => {
+    const email = waitlistEmail.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setWaitlistError("Please enter a valid email address.");
+      return;
+    }
+    localStorage.setItem("lp_waitlist_email", email);
+    setWaitlistJoined(true);
+    setWaitlistError("");
+  };
+
   const tabs = [
-    { id: "pulse", label: "🧠 Pulse" },
-    { id: "timeline", label: "📊 Timeline" },
-    { id: "duel", label: "⚔️ Duel" },
-    { id: "oracle", label: "🔮 Oracle" },
+    { id: "pulse", label: "🧠 Pulse", pro: false },
+    { id: "timeline", label: "📊 Timeline", pro: false },
+    { id: "duel", label: "⚔️ Duel", pro: false },
+    { id: "oracle", label: "🔮 Oracle", pro: false },
+    { id: "multi", label: "🏙️ Multi", pro: true },
+    { id: "costs", label: "💰 Costs", pro: true },
+    { id: "air", label: "🌬️ Air", pro: true },
+    { id: "radar", label: "📡 Radar", pro: true },
+    { id: "history", label: "📈 History", pro: true },
   ];
 
-  const PRO_FEATURES = ["Multi-city (40+ cities)", "Full cost of living data", "Air quality tracking", "Livability radar", "Historical trends", "API access"];
-  const FREE_FEATURES = ["2-city comparison", "Real-time clocks & heartbeats", "Emotional weather", "AI Oracle (5 queries/day)", "Time bridge"];
+  const PRO_FEATURES = ["Multi-city grid (up to 6 cities)", "Cost of living data (rent, food, transport)", "Real-time air quality (PM2.5, AQI)", "Livability radar (8 dimensions)", "Population trend charts (2020–2024)", "Unlimited Oracle queries"];
+  const FREE_FEATURES = ["2-city comparison", "Real-time clocks & heartbeats", "Emotional weather", "AI Oracle (unlimited)", "Time bridge"];
 
   return (
     <div style={{ minHeight: "100vh", background: "#080808", color: "#e0e0e0", fontFamily: "'DM Sans',sans-serif" }}>
@@ -971,14 +1429,15 @@ export default function LivePulse() {
       )}
 
       {/* TABS */}
-      <div style={{ display: "flex", justifyContent: "center", gap: "4px", padding: "4px 14px 10px" }}>
+      <div style={{ display: "flex", justifyContent: "center", gap: "4px", padding: "4px 14px 10px", flexWrap: "wrap" }}>
         {tabs.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
-            padding: "6px 16px", borderRadius: "20px", fontSize: "11px", cursor: "pointer", fontFamily: "'DM Sans'", transition: "all .2s",
-            border: tab === t.id ? "1px solid rgba(255,255,255,.1)" : "1px solid rgba(255,255,255,.04)",
-            background: tab === t.id ? "rgba(255,255,255,.06)" : "transparent",
-            color: tab === t.id ? "#fff" : "#555", fontWeight: tab === t.id ? 700 : 400,
-          }}>{t.label}</button>
+            padding: "6px 12px", borderRadius: "20px", fontSize: "10px", cursor: "pointer", fontFamily: "'DM Sans'", transition: "all .2s",
+            border: tab === t.id ? `1px solid ${t.pro ? "#F7C94855" : "rgba(255,255,255,.1)"}` : `1px solid ${t.pro ? "#F7C94822" : "rgba(255,255,255,.04)"}`,
+            background: tab === t.id ? (t.pro ? "rgba(247,201,72,.1)" : "rgba(255,255,255,.06)") : "transparent",
+            color: tab === t.id ? (t.pro ? "#F7C948" : "#fff") : (t.pro ? "#F7C94866" : "#555"),
+            fontWeight: tab === t.id ? 700 : 400,
+          }}>{t.label}{t.pro ? " ⭐" : ""}</button>
         ))}
         <button onClick={() => setShowPro(!showPro)} style={{
           padding: "6px 14px", borderRadius: "20px", fontSize: "10px", cursor: "pointer", fontFamily: "'DM Sans'",
@@ -1009,14 +1468,32 @@ export default function LivePulse() {
           </div>
           {isPro ? (
             <div style={{ textAlign: "center", padding: "10px", borderRadius: "8px", background: "rgba(127,255,154,.08)", border: "1px solid rgba(127,255,154,.2)", fontSize: "12px", color: "#7FFF9A", fontWeight: 700 }}>
-              You're on Pro — unlimited Oracle queries active
+              You're on Pro — all features unlocked
             </div>
           ) : (
             <button onClick={handleCheckout} disabled={checkoutLoading} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "none", background: "linear-gradient(135deg, #F7C948, #FF6B35)", color: "#000", fontWeight: 700, fontSize: "13px", cursor: checkoutLoading ? "wait" : "pointer", fontFamily: "'DM Sans'", opacity: checkoutLoading ? .7 : 1 }}>
               {checkoutLoading ? "Redirecting to Stripe..." : "Get Pro — $5/mo"}
             </button>
           )}
-          <button onClick={() => setShowPro(false)} style={{ width: "100%", padding: "6px", border: "none", background: "none", color: "#666", fontSize: "10px", cursor: "pointer", marginTop: "6px", fontFamily: "'DM Sans'" }}>Close</button>
+          <div style={{ margin: "10px 0", borderTop: "1px solid rgba(255,255,255,.06)", paddingTop: "10px" }}>
+            {waitlistJoined ? (
+              <div style={{ padding: "10px", borderRadius: "8px", background: "rgba(0,228,64,.08)", border: "1px solid rgba(0,228,64,.2)", textAlign: "center" }}>
+                <div style={{ fontSize: "12px", fontWeight: 700, color: "#00E440" }}>🎉 You're on the waitlist!</div>
+                <div style={{ fontSize: "9px", opacity: .5, marginTop: "4px" }}>We'll email {localStorage.getItem("lp_waitlist_email")} when Pro launches.</div>
+              </div>
+            ) : (
+              <div>
+                <div style={{ fontSize: "9px", opacity: .4, marginBottom: "6px", textAlign: "center" }}>Or join the waitlist for early-adopter pricing</div>
+                <div style={{ display: "flex", gap: "6px" }}>
+                  <input type="email" value={waitlistEmail} onChange={e => { setWaitlistEmail(e.target.value); setWaitlistError(""); }} onKeyDown={e => e.key === "Enter" && joinWaitlist()} placeholder="your@email.com"
+                    style={{ flex: 1, padding: "8px 12px", borderRadius: "8px", border: `1px solid ${waitlistError ? "#FF4444" : "rgba(255,255,255,.1)"}`, background: "rgba(255,255,255,.04)", color: "#fff", fontSize: "12px", outline: "none", fontFamily: "'DM Sans'" }} />
+                  <button onClick={joinWaitlist} style={{ padding: "8px 12px", borderRadius: "8px", border: "1px solid #F7C94844", background: "rgba(247,201,72,.1)", color: "#F7C948", fontWeight: 700, fontSize: "11px", cursor: "pointer", fontFamily: "'DM Sans'", whiteSpace: "nowrap" }}>Join Waitlist</button>
+                </div>
+                {waitlistError && <div style={{ fontSize: "9px", color: "#FF4444", marginTop: "4px" }}>{waitlistError}</div>}
+              </div>
+            )}
+          </div>
+          <button onClick={() => setShowPro(false)} style={{ width: "100%", padding: "6px", border: "none", background: "none", color: "#666", fontSize: "10px", cursor: "pointer", marginTop: "4px", fontFamily: "'DM Sans'" }}>Close</button>
         </div>
       )}
 
@@ -1037,12 +1514,17 @@ export default function LivePulse() {
         )}
         {tab === "timeline" && <div style={{ animation: "slideUp .4s ease-out" }}><TimelineView city1={city1} city2={city2} /></div>}
         {tab === "duel" && <div style={{ animation: "slideUp .4s ease-out" }}><DuelView city1={city1} city2={city2} city3={city3} /></div>}
-        {tab === "oracle" && <div style={{ animation: "slideUp .4s ease-out" }}><OracleChat city1={city1} city2={city2} city3={city3} isPro={isPro} onUpgrade={() => setShowPro(true)} /></div>}
+        {tab === "oracle" && <div style={{ animation: "slideUp .4s ease-out" }}><OracleChat city1={city1} city2={city2} city3={city3} /></div>}
+        {tab === "multi" && <div style={{ animation: "slideUp .4s ease-out" }}><MultiCityGrid multiCities={multiCities} onToggleCity={toggleMultiCity} /></div>}
+        {tab === "costs" && <div style={{ animation: "slideUp .4s ease-out" }}><CostOfLivingPanel multiCities={multiCities} /></div>}
+        {tab === "air" && <div style={{ animation: "slideUp .4s ease-out" }}><AirQualityPanel multiCities={multiCities} /></div>}
+        {tab === "radar" && <div style={{ animation: "slideUp .4s ease-out" }}><LiveabilityRadar multiCities={multiCities} /></div>}
+        {tab === "history" && <div style={{ animation: "slideUp .4s ease-out" }}><HistoricalTrends multiCities={multiCities} /></div>}
       </div>
 
       {/* FOOTER */}
       <div style={{ textAlign: "center", padding: "14px", borderTop: "1px solid rgba(255,255,255,.03)" }}>
-        <div style={{ fontSize: "8px", letterSpacing: "2px", opacity: .08 }}>LIVEPULSE v3.0 · BUILT BY TAHSEEN · POWERED BY CLAUDE</div>
+        <div style={{ fontSize: "8px", letterSpacing: "2px", opacity: .08 }}>LIVEPULSE v3.1 · BUILT BY TAHSEEN · ORACLE POWERED BY OLLAMA</div>
       </div>
     </div>
   );
