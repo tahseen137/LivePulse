@@ -675,12 +675,14 @@ function OracleChat({ city1, city2, city3 }) {
 
     const ollamaUrl = import.meta.env.VITE_OLLAMA_URL || "http://localhost:11434";
     const ollamaKey = import.meta.env.VITE_OLLAMA_KEY || "";
+    const ctrl = new AbortController();
+    const timeoutId = setTimeout(() => ctrl.abort(), 30000);
     try {
       const res = await fetch(`${ollamaUrl}/api/chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(ollamaKey ? { "Authorization": `Bearer ${ollamaKey}` } : {}),
+          ...(ollamaKey && { "Authorization": `Bearer ${ollamaKey}` }),
         },
         body: JSON.stringify({
           model: "gemma4:e4b",
@@ -689,7 +691,9 @@ function OracleChat({ city1, city2, city3 }) {
           think: false,
           options: { temperature: 0.7, num_predict: 400 },
         }),
+        signal: ctrl.signal,
       });
+      clearTimeout(timeoutId);
       if (!res.ok) throw new Error(`Oracle ${res.status}`);
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -700,7 +704,7 @@ function OracleChat({ city1, city2, city3 }) {
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
+        buffer = lines.pop() ?? "";
         for (const line of lines) {
           if (!line.trim()) continue;
           try {
@@ -709,7 +713,7 @@ function OracleChat({ city1, city2, city3 }) {
               fullText += parsed.message.content;
               setAns(fullText);
             }
-          } catch (_e) {}
+          } catch { /* partial line — ignore */ }
         }
       }
       const text = fullText || "The Oracle meditates in silence...";
@@ -718,8 +722,11 @@ function OracleChat({ city1, city2, city3 }) {
         LS.set(pairKey, next);
         return next;
       });
-    } catch {
-      setAns("The Oracle is unreachable. Check your connection and try again.");
+    } catch (err) {
+      clearTimeout(timeoutId);
+      setAns(err.name === "AbortError"
+        ? "The Oracle timed out. Please try again."
+        : "The Oracle is unreachable. Check your connection and try again.");
     }
     setLoading(false);
   };
@@ -731,7 +738,7 @@ function OracleChat({ city1, city2, city3 }) {
       <div style={{ textAlign: "center", marginBottom: "16px" }}>
         <div style={{ fontSize: "40px", animation: "float 3s ease-in-out infinite" }}>🔮</div>
         <h2 style={{ fontSize: "18px", fontWeight: 900, fontFamily: "'Playfair Display',serif", margin: "4px 0 2px" }}>The Oracle</h2>
-        <div style={{ fontSize: "9px", opacity: .25 }}>{city3 ? `${city1.name}, ${city2.name} & ${city3.name}` : `${city1.name} & ${city2.name}`} · powered by gemma4:e4b</div>
+        <div style={{ fontSize: "9px", opacity: .25 }}>AI Oracle · {city3 ? `${city1.name}, ${city2.name} & ${city3.name}` : `${city1.name} & ${city2.name}`} · powered by Ollama gemma4:e4b</div>
       </div>
       {history.length > 0 && (
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "6px" }}>
@@ -1535,7 +1542,7 @@ export default function LivePulse() {
 
       {/* FOOTER */}
       <div style={{ textAlign: "center", padding: "14px", borderTop: "1px solid rgba(255,255,255,.03)" }}>
-        <div style={{ fontSize: "8px", letterSpacing: "2px", opacity: .08 }}>LIVEPULSE v3.1 · BUILT BY TAHSEEN · ORACLE POWERED BY OLLAMA</div>
+        <div style={{ fontSize: "8px", letterSpacing: "2px", opacity: .08 }}>LIVEPULSE v3.2 · BUILT BY TAHSEEN · ORACLE POWERED BY OLLAMA</div>
       </div>
     </div>
   );

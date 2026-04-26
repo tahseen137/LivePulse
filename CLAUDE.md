@@ -32,7 +32,7 @@ No CSS files — all styles are inline React style objects + a `<style>` tag wit
 - **Monolithic by design** — single `App.jsx`, no component folders, no routing, no state library
 - **Client-side only** — timezone math, heartbeat generation, mood computation, and all Pro data in the browser
 - **No tests** — no jest/vitest setup
-- **Oracle powered by local Ollama** — calls `http://localhost:11434/api/chat` with the `gemma4` model. Requires Ollama running locally (`ollama serve`). Graceful error message if offline.
+- **Oracle powered by Ollama** — calls `VITE_OLLAMA_URL/api/chat` with model `gemma4:e4b`, Bearer auth via `VITE_OLLAMA_KEY`. Streams NDJSON response tokens. Falls back to timeout error message if unreachable.
 - **localStorage persistence** — Oracle chat history per city pair, favorites, recents, Pro status and user info
 
 ## Key Data Constants (`src/App.jsx`)
@@ -71,7 +71,7 @@ No CSS files — all styles are inline React style objects + a `<style>` tag wit
 | `FilterChips` | Continent + UTC range filter chips for city picker |
 | `CityPulse` | Main city panel — heartbeat, clock, mood, stats |
 | `TimeBridge` | Side-by-side time comparison, shows hour difference (supports 3 cities) |
-| `OracleChat` | AI chat — calls Cloudflare-proxied Ollama gemma4:e4b, persists last 20 messages per city pair |
+| `OracleChat` | AI chat — calls Ollama gemma4:e4b via `VITE_OLLAMA_URL`, streams NDJSON, persists last 20 messages per city pair |
 | `DuelView` | Head-to-head bar charts (population, density, BPM) — supports 3 cities |
 | `ShareCard` | Share modal with copyable URL |
 | `ProCitySelector` | Pro: shared city pill bar — clickable chips to remove cities, `+ City` button to add |
@@ -122,7 +122,7 @@ Pro tabs require sign-up. Clicking a Pro tab without signing up opens the sign-u
 40 cities across Africa, Asia, Europe, North/South America, Oceania.
 
 ## External Integrations
-- **Ollama (Cloudflare proxy)** — endpoint `${VITE_OLLAMA_URL}/api/chat`, model `gemma4:e4b`, stream: true (NDJSON). Called in `OracleChat`. Requires `VITE_OLLAMA_URL` and `VITE_OLLAMA_KEY` env vars (set in `.env`, never committed). Auth via `Authorization: Bearer <VITE_OLLAMA_KEY>`.
+- **Ollama (Cloudflare proxy)** — endpoint `${VITE_OLLAMA_URL}/api/chat`, model `gemma4:e4b`, Bearer auth via `VITE_OLLAMA_KEY`, `stream: true` (NDJSON). Called in `OracleChat`. Env vars required — see `.env.example`.
 - **Open-Meteo Air Quality API** — `https://air-quality-api.open-meteo.com/v1/air-quality` with `?latitude=&longitude=&current=pm2_5,pm10,us_aqi`. Free, no API key. Called in `AirQualityPanel` when the Air tab is active.
 - **Google Fonts** — Playfair Display, DM Sans, JetBrains Mono (loaded in `index.html`)
 - **Vercel** — hosting + CI/CD
@@ -141,7 +141,7 @@ Pro tabs require sign-up. Clicking a Pro tab without signing up opens the sign-u
 `multiCities` is a `useState` array of up to 6 city ids, defaulting to `["dhaka", "toronto", "tokyo", "london", "nyc", "dubai"]`. It is shared across all 5 Pro tabs. The `ProCitySelector` bar at the top of every Pro tab shows the current cities as chips (click to remove) and a `+ City` button to add more (capped at 6).
 
 ## Known Gaps / Gotchas
-- **Oracle env vars required** — `VITE_OLLAMA_URL` and `VITE_OLLAMA_KEY` must be set in `.env` (local) and in Vercel env vars (production). Falls back to `http://localhost:11434` with no auth if vars are absent.
+- **Oracle requires `VITE_OLLAMA_URL` and `VITE_OLLAMA_KEY`** — must be set in `.env` (local) and in Vercel env vars (production). Falls back to `http://localhost:11434` with no auth if vars are absent. Oracle shows a timeout/connection error if the endpoint is unreachable.
 - **Pro sign-up is honor system** — name + email form grants Pro access client-side only. No server validation, no email verification, no payment.
 - **Air quality depends on Open-Meteo** — if the API is down or rate-limited, AQI shows "—". No caching; refetches on every tab visit.
 - **No real-time external data for other features** — weather, news, sports are not implemented; all Pro data (cost, livability, history) is hardcoded.
