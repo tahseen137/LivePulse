@@ -876,32 +876,14 @@ function ShareCard({ city1, city2, url, onClose }) {
 // PRO COMPONENTS
 // ══════════════════════════════════════════════════════════
 
-function MultiCityGrid({ multiCities, onToggleCity }) {
+function MultiCityGrid({ multiCities }) {
   const cities = multiCities.map(id => CITY_DB.find(c => c.id === id)).filter(Boolean);
   return (
     <div>
-      <div style={{ marginBottom: "12px" }}>
-        <div style={{ fontSize: "8px", letterSpacing: "2px", opacity: .3, marginBottom: "8px", textAlign: "center" }}>SELECT CITIES (MAX 6)</div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", justifyContent: "center", maxHeight: "140px", overflowY: "auto" }}>
-          {CITY_DB.map(c => {
-            const active = multiCities.includes(c.id);
-            return (
-              <button key={c.id} onClick={() => onToggleCity(c.id)} style={{
-                padding: "4px 8px", borderRadius: "16px", fontSize: "10px", cursor: "pointer", fontFamily: "'DM Sans'",
-                border: active ? `1px solid ${c.accent}` : "1px solid rgba(255,255,255,.06)",
-                background: active ? `${c.accent}22` : "rgba(255,255,255,.02)",
-                color: active ? c.accent : "#555", transition: "all .15s",
-              }}>
-                {c.flag} {c.name}
-              </button>
-            );
-          })}
-        </div>
-      </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "10px" }}>
         {cities.map(city => <CityPulse key={city.id} city={city} />)}
       </div>
-      {cities.length === 0 && <div style={{ textAlign: "center", padding: "40px", opacity: .3 }}>Select cities above to compare them side by side</div>}
+      {cities.length === 0 && <div style={{ textAlign: "center", padding: "40px", opacity: .3 }}>Use the city bar above to add cities</div>}
     </div>
   );
 }
@@ -1152,6 +1134,26 @@ function HistoricalTrends({ multiCities }) {
   );
 }
 
+// ── ProCitySelector — shared city bar for all Pro tabs ───
+function ProCitySelector({ multiCities, onToggleCity, onAddCity }) {
+  const cities = multiCities.map(id => CITY_DB.find(c => c.id === id)).filter(Boolean);
+  return (
+    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center", padding: "10px 12px", borderRadius: "10px", background: "rgba(247,201,72,.04)", border: "1px solid rgba(247,201,72,.12)", marginBottom: "14px" }}>
+      <span style={{ fontSize: "8px", letterSpacing: "2px", opacity: .3, whiteSpace: "nowrap" }}>CITIES:</span>
+      {cities.map(city => (
+        <button key={city.id} onClick={() => onToggleCity(city.id)} style={{ display: "flex", alignItems: "center", gap: "4px", padding: "4px 8px", borderRadius: "20px", background: `${city.accent}18`, border: `1px solid ${city.accent}44`, cursor: "pointer", fontFamily: "'DM Sans'" }}>
+          <span style={{ fontSize: "13px" }}>{city.flag}</span>
+          <span style={{ fontSize: "11px", color: city.accent, fontWeight: 600 }}>{city.name}</span>
+          <span style={{ fontSize: "9px", color: city.accent, opacity: .6, marginLeft: "2px" }}>✕</span>
+        </button>
+      ))}
+      {cities.length < 6 && (
+        <button onClick={onAddCity} style={{ padding: "4px 10px", borderRadius: "20px", border: "1px dashed rgba(247,201,72,.3)", background: "none", color: "#F7C948", fontSize: "10px", cursor: "pointer", fontFamily: "'DM Sans'" }}>+ City</button>
+      )}
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════
 // MAIN APP
 // ══════════════════════════════════════════════════════════
@@ -1177,49 +1179,10 @@ export default function LivePulse() {
   const [favorites, setFavorites] = useState(() => LS.get("livepulse_favorites", []));
   const [recents, setRecents] = useState(() => LS.get("livepulse_recents", []));
   const [isPro, setIsPro] = useState(() => localStorage.getItem("lp_pro") === "true");
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
-  const [proActivated, setProActivated] = useState(false);
   const [multiCities, setMultiCities] = useState(["dhaka", "toronto", "tokyo", "london", "nyc", "dubai"]);
-  const [waitlistEmail, setWaitlistEmail] = useState("");
-  const [waitlistJoined, setWaitlistJoined] = useState(() => !!localStorage.getItem("lp_waitlist_email"));
-  const [waitlistError, setWaitlistError] = useState("");
-
-  // After Stripe redirects back with ?pro_session=<id>, verify and activate Pro
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const proSession = params.get("pro_session");
-    if (!proSession) return;
-    // Clean the URL immediately so a refresh doesn't re-verify
-    window.history.replaceState({}, "", "/");
-    fetch(`/api/pro-callback?session_id=${encodeURIComponent(proSession)}`)
-      .then(r => r.json())
-      .then(data => {
-        if (data.isPro) {
-          setIsPro(true);
-          localStorage.setItem("lp_pro", "true");
-          setProActivated(true);
-          setShowPro(true);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  const handleCheckout = async () => {
-    setCheckoutLoading(true);
-    try {
-      const res = await fetch("/api/checkout", { method: "POST" });
-      const { url, error } = await res.json();
-      if (url) {
-        window.location.href = url;
-      } else {
-        alert(error || "Could not start checkout. Please try again.");
-        setCheckoutLoading(false);
-      }
-    } catch {
-      alert("Could not connect to checkout. Please try again.");
-      setCheckoutLoading(false);
-    }
-  };
+  const [signupName, setSignupName] = useState("");
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupError, setSignupError] = useState("");
 
   const city1 = CITY_DB.find(c => c.id === city1Id);
   const city2 = CITY_DB.find(c => c.id === city2Id);
@@ -1265,9 +1228,15 @@ export default function LivePulse() {
 
   const openPicker = (slot) => { setSelecting(selecting === slot ? null : slot); setSearch(""); setContinentFilter(null); setUtcFilter(null); };
   const removeCity3 = () => { setCity3Id(null); if (selecting === 3) setSelecting(null); };
-  const currentSelectedId = selecting === 1 ? city1Id : selecting === 2 ? city2Id : city3Id;
+  const currentSelectedId = selecting === 1 ? city1Id : selecting === 2 ? city2Id : selecting === 3 ? city3Id : null;
 
   const selectCity = (id) => {
+    if (selecting === "multi_add") {
+      toggleMultiCity(id);
+      setSelecting(null);
+      setSearch("");
+      return;
+    }
     const n1 = selecting === 1 ? id : city1Id;
     const n2 = selecting === 2 ? id : city2Id;
     if (selecting === 1) setCity1Id(id);
@@ -1301,15 +1270,18 @@ export default function LivePulse() {
     });
   };
 
-  const joinWaitlist = () => {
-    const email = waitlistEmail.trim();
+  const handleSignup = () => {
+    const name = signupName.trim();
+    const email = signupEmail.trim();
+    if (!name) { setSignupError("Please enter your name."); return; }
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setWaitlistError("Please enter a valid email address.");
-      return;
+      setSignupError("Please enter a valid email address."); return;
     }
-    localStorage.setItem("lp_waitlist_email", email);
-    setWaitlistJoined(true);
-    setWaitlistError("");
+    LS.set("lp_pro_user", { name, email });
+    localStorage.setItem("lp_pro", "true");
+    setIsPro(true);
+    setSignupError("");
+    setShowPro(false);
   };
 
   const tabs = [
@@ -1343,8 +1315,11 @@ export default function LivePulse() {
 
       {/* HEADER */}
       <div style={{ textAlign: "center", padding: "24px 16px 8px", animation: "slideUp .6s ease-out" }}>
-        <h1 style={{ fontSize: "clamp(24px,5vw,38px)", fontWeight: 900, margin: "0 0 2px", fontFamily: "'Playfair Display',serif", background: "linear-gradient(135deg, #FF6B35, #F7C948, #4A90D9, #8EC5FC)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>LIVEPULSE</h1>
-        <div style={{ fontSize: "9px", letterSpacing: "3px", opacity: .2 }}>FEEL A CITY BEFORE YOU GO</div>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: "10px" }}>
+          <h1 style={{ fontSize: "clamp(24px,5vw,38px)", fontWeight: 900, margin: "0", fontFamily: "'Playfair Display',serif", background: "linear-gradient(135deg, #FF6B35, #F7C948, #4A90D9, #8EC5FC)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>LIVEPULSE</h1>
+          {isPro && <span style={{ padding: "3px 9px", borderRadius: "20px", background: "linear-gradient(135deg, #F7C948, #FF6B35)", color: "#000", fontSize: "9px", fontWeight: 900, letterSpacing: "2px" }}>PRO</span>}
+        </div>
+        <div style={{ fontSize: "9px", letterSpacing: "3px", opacity: .2, marginTop: "2px" }}>FEEL A CITY BEFORE YOU GO</div>
       </div>
 
       {/* CITY SELECTOR BAR */}
@@ -1431,7 +1406,7 @@ export default function LivePulse() {
       {/* TABS */}
       <div style={{ display: "flex", justifyContent: "center", gap: "4px", padding: "4px 14px 10px", flexWrap: "wrap" }}>
         {tabs.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{
+          <button key={t.id} onClick={() => { if (t.pro && !isPro) { setShowPro(true); return; } setTab(t.id); }} style={{
             padding: "6px 12px", borderRadius: "20px", fontSize: "10px", cursor: "pointer", fontFamily: "'DM Sans'", transition: "all .2s",
             border: tab === t.id ? `1px solid ${t.pro ? "#F7C94855" : "rgba(255,255,255,.1)"}` : `1px solid ${t.pro ? "#F7C94822" : "rgba(255,255,255,.04)"}`,
             background: tab === t.id ? (t.pro ? "rgba(247,201,72,.1)" : "rgba(255,255,255,.06)") : "transparent",
@@ -1445,55 +1420,43 @@ export default function LivePulse() {
         }}>⭐ PRO</button>
       </div>
 
-      {/* PRO MODAL */}
+      {/* PRO SIGN-UP MODAL */}
       {showPro && (
-        <div style={{ maxWidth: "500px", margin: "0 auto 16px", padding: "20px", borderRadius: "12px", background: "linear-gradient(135deg, rgba(247,201,72,.06), rgba(255,107,53,.06))", border: "1px solid rgba(247,201,72,.2)", animation: "fadeIn .3s" }}>
-          <div style={{ textAlign: "center", marginBottom: "12px" }}>
-            <div style={{ fontSize: "24px" }}>⭐</div>
+        <div style={{ maxWidth: "460px", margin: "0 auto 16px", padding: "20px", borderRadius: "12px", background: "linear-gradient(135deg, rgba(247,201,72,.06), rgba(255,107,53,.06))", border: "1px solid rgba(247,201,72,.2)", animation: "fadeIn .3s" }}>
+          <div style={{ textAlign: "center", marginBottom: "14px" }}>
+            <div style={{ fontSize: "28px" }}>⭐</div>
             <div style={{ fontSize: "18px", fontWeight: 900, fontFamily: "'Playfair Display',serif", color: "#F7C948" }}>LivePulse Pro</div>
-            {proActivated
-              ? <div style={{ fontSize: "11px", color: "#7FFF9A", marginTop: "4px" }}>Pro activated — welcome aboard!</div>
-              : <div style={{ fontSize: "10px", opacity: .4 }}>Unlock the full city consciousness experience</div>
-            }
+            <div style={{ fontSize: "10px", opacity: .4, marginTop: "2px" }}>Free — unlock the full city consciousness experience</div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
             <div>
               <div style={{ fontSize: "9px", letterSpacing: "2px", opacity: .4, marginBottom: "6px" }}>FREE</div>
               {FREE_FEATURES.map(f => <div key={f} style={{ fontSize: "10px", opacity: .5, padding: "2px 0" }}>✓ {f}</div>)}
             </div>
             <div>
-              <div style={{ fontSize: "9px", letterSpacing: "2px", color: "#F7C948", marginBottom: "6px" }}>PRO — $5/MO</div>
+              <div style={{ fontSize: "9px", letterSpacing: "2px", color: "#F7C948", marginBottom: "6px" }}>PRO — FREE</div>
               {PRO_FEATURES.map(f => <div key={f} style={{ fontSize: "10px", color: "#F7C948", padding: "2px 0" }}>⭐ {f}</div>)}
             </div>
           </div>
           {isPro ? (
-            <div style={{ textAlign: "center", padding: "10px", borderRadius: "8px", background: "rgba(127,255,154,.08)", border: "1px solid rgba(127,255,154,.2)", fontSize: "12px", color: "#7FFF9A", fontWeight: 700 }}>
-              You're on Pro — all features unlocked
+            <div style={{ textAlign: "center", padding: "12px", borderRadius: "8px", background: "rgba(127,255,154,.08)", border: "1px solid rgba(127,255,154,.2)", fontSize: "12px", color: "#7FFF9A", fontWeight: 700 }}>
+              ✓ You're on Pro — all features unlocked
             </div>
           ) : (
-            <button onClick={handleCheckout} disabled={checkoutLoading} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "none", background: "linear-gradient(135deg, #F7C948, #FF6B35)", color: "#000", fontWeight: 700, fontSize: "13px", cursor: checkoutLoading ? "wait" : "pointer", fontFamily: "'DM Sans'", opacity: checkoutLoading ? .7 : 1 }}>
-              {checkoutLoading ? "Redirecting to Stripe..." : "Get Pro — $5/mo"}
-            </button>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <input type="text" value={signupName} onChange={e => { setSignupName(e.target.value); setSignupError(""); }}
+                placeholder="Your name"
+                style={{ padding: "10px 12px", borderRadius: "8px", border: `1px solid ${signupError && !signupName.trim() ? "#FF4444" : "rgba(255,255,255,.12)"}`, background: "rgba(255,255,255,.04)", color: "#fff", fontSize: "12px", outline: "none", fontFamily: "'DM Sans'" }} />
+              <input type="email" value={signupEmail} onChange={e => { setSignupEmail(e.target.value); setSignupError(""); }} onKeyDown={e => e.key === "Enter" && handleSignup()}
+                placeholder="your@email.com"
+                style={{ padding: "10px 12px", borderRadius: "8px", border: `1px solid ${signupError && !signupEmail.trim() ? "#FF4444" : "rgba(255,255,255,.12)"}`, background: "rgba(255,255,255,.04)", color: "#fff", fontSize: "12px", outline: "none", fontFamily: "'DM Sans'" }} />
+              {signupError && <div style={{ fontSize: "9px", color: "#FF4444" }}>{signupError}</div>}
+              <button onClick={handleSignup} style={{ padding: "11px", borderRadius: "8px", border: "none", background: "linear-gradient(135deg, #F7C948, #FF6B35)", color: "#000", fontWeight: 700, fontSize: "13px", cursor: "pointer", fontFamily: "'DM Sans'" }}>
+                Get Pro — Free
+              </button>
+            </div>
           )}
-          <div style={{ margin: "10px 0", borderTop: "1px solid rgba(255,255,255,.06)", paddingTop: "10px" }}>
-            {waitlistJoined ? (
-              <div style={{ padding: "10px", borderRadius: "8px", background: "rgba(0,228,64,.08)", border: "1px solid rgba(0,228,64,.2)", textAlign: "center" }}>
-                <div style={{ fontSize: "12px", fontWeight: 700, color: "#00E440" }}>🎉 You're on the waitlist!</div>
-                <div style={{ fontSize: "9px", opacity: .5, marginTop: "4px" }}>We'll email {localStorage.getItem("lp_waitlist_email")} when Pro launches.</div>
-              </div>
-            ) : (
-              <div>
-                <div style={{ fontSize: "9px", opacity: .4, marginBottom: "6px", textAlign: "center" }}>Or join the waitlist for early-adopter pricing</div>
-                <div style={{ display: "flex", gap: "6px" }}>
-                  <input type="email" value={waitlistEmail} onChange={e => { setWaitlistEmail(e.target.value); setWaitlistError(""); }} onKeyDown={e => e.key === "Enter" && joinWaitlist()} placeholder="your@email.com"
-                    style={{ flex: 1, padding: "8px 12px", borderRadius: "8px", border: `1px solid ${waitlistError ? "#FF4444" : "rgba(255,255,255,.1)"}`, background: "rgba(255,255,255,.04)", color: "#fff", fontSize: "12px", outline: "none", fontFamily: "'DM Sans'" }} />
-                  <button onClick={joinWaitlist} style={{ padding: "8px 12px", borderRadius: "8px", border: "1px solid #F7C94844", background: "rgba(247,201,72,.1)", color: "#F7C948", fontWeight: 700, fontSize: "11px", cursor: "pointer", fontFamily: "'DM Sans'", whiteSpace: "nowrap" }}>Join Waitlist</button>
-                </div>
-                {waitlistError && <div style={{ fontSize: "9px", color: "#FF4444", marginTop: "4px" }}>{waitlistError}</div>}
-              </div>
-            )}
-          </div>
-          <button onClick={() => setShowPro(false)} style={{ width: "100%", padding: "6px", border: "none", background: "none", color: "#666", fontSize: "10px", cursor: "pointer", marginTop: "4px", fontFamily: "'DM Sans'" }}>Close</button>
+          <button onClick={() => setShowPro(false)} style={{ width: "100%", padding: "6px", border: "none", background: "none", color: "#555", fontSize: "10px", cursor: "pointer", marginTop: "8px", fontFamily: "'DM Sans'" }}>Close</button>
         </div>
       )}
 
@@ -1515,11 +1478,34 @@ export default function LivePulse() {
         {tab === "timeline" && <div style={{ animation: "slideUp .4s ease-out" }}><TimelineView city1={city1} city2={city2} /></div>}
         {tab === "duel" && <div style={{ animation: "slideUp .4s ease-out" }}><DuelView city1={city1} city2={city2} city3={city3} /></div>}
         {tab === "oracle" && <div style={{ animation: "slideUp .4s ease-out" }}><OracleChat city1={city1} city2={city2} city3={city3} /></div>}
-        {tab === "multi" && <div style={{ animation: "slideUp .4s ease-out" }}><MultiCityGrid multiCities={multiCities} onToggleCity={toggleMultiCity} /></div>}
-        {tab === "costs" && <div style={{ animation: "slideUp .4s ease-out" }}><CostOfLivingPanel multiCities={multiCities} /></div>}
-        {tab === "air" && <div style={{ animation: "slideUp .4s ease-out" }}><AirQualityPanel multiCities={multiCities} /></div>}
-        {tab === "radar" && <div style={{ animation: "slideUp .4s ease-out" }}><LiveabilityRadar multiCities={multiCities} /></div>}
-        {tab === "history" && <div style={{ animation: "slideUp .4s ease-out" }}><HistoricalTrends multiCities={multiCities} /></div>}
+        {["multi","costs","air","radar","history"].includes(tab) && (
+          <div style={{ animation: "slideUp .4s ease-out" }}>
+            <ProCitySelector
+              multiCities={multiCities}
+              onToggleCity={toggleMultiCity}
+              onAddCity={() => { setSelecting("multi_add"); setSearch(""); setContinentFilter(null); setUtcFilter(null); }}
+            />
+            {selecting === "multi_add" && (
+              <div style={{ maxWidth: "500px", margin: "0 auto 12px", animation: "fadeIn .3s" }}>
+                <FilterChips continentFilter={continentFilter} setContinentFilter={setContinentFilter} utcFilter={utcFilter} setUtcFilter={setUtcFilter} />
+                <input type="text" value={search} onChange={e => setSearch(e.target.value)} autoFocus
+                  placeholder="Search cities to add..." style={{ width: "100%", padding: "9px 14px", borderRadius: "8px", border: "1px solid rgba(255,255,255,.1)", background: "rgba(255,255,255,.04)", color: "#fff", fontSize: "12px", outline: "none", fontFamily: "'DM Sans'", marginBottom: "6px" }} />
+                <div style={{ maxHeight: "220px", overflowY: "auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px" }}>
+                  {sortedFiltered.map(c => (
+                    <CityCard key={c.id} city={c} onSelect={selectCity} selected={multiCities.includes(c.id)}
+                      isFavorite={favorites.includes(c.id)} onToggleFavorite={toggleFavorite} />
+                  ))}
+                </div>
+                <button onClick={() => { setSelecting(null); setSearch(""); }} style={{ width: "100%", padding: "6px", border: "1px solid rgba(255,255,255,.06)", background: "none", color: "#555", fontSize: "9px", cursor: "pointer", borderRadius: "6px", marginTop: "6px", fontFamily: "'DM Sans'" }}>Done</button>
+              </div>
+            )}
+            {tab === "multi" && <MultiCityGrid multiCities={multiCities} />}
+            {tab === "costs" && <CostOfLivingPanel multiCities={multiCities} />}
+            {tab === "air" && <AirQualityPanel multiCities={multiCities} />}
+            {tab === "radar" && <LiveabilityRadar multiCities={multiCities} />}
+            {tab === "history" && <HistoricalTrends multiCities={multiCities} />}
+          </div>
+        )}
       </div>
 
       {/* FOOTER */}
