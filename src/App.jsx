@@ -673,28 +673,53 @@ function OracleChat({ city1, city2, city3 }) {
       { role: "user", content: `Cities:\n${cityContext}\n\nQuestion: ${question}` },
     ];
 
+    const ollamaUrl = import.meta.env.VITE_OLLAMA_URL || "http://localhost:11434";
+    const ollamaKey = import.meta.env.VITE_OLLAMA_KEY || "";
     try {
-      const res = await fetch("http://localhost:11434/api/chat", {
+      const res = await fetch(`${ollamaUrl}/api/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(ollamaKey ? { "Authorization": `Bearer ${ollamaKey}` } : {}),
+        },
         body: JSON.stringify({
-          model: "gemma4",
+          model: "gemma4:e4b",
           messages,
-          stream: false,
+          stream: true,
+          think: false,
           options: { temperature: 0.7, num_predict: 400 },
         }),
       });
-      if (!res.ok) throw new Error(`Ollama ${res.status}`);
-      const data = await res.json();
-      const text = data.message?.content || "The Oracle meditates in silence...";
-      setAns(text);
+      if (!res.ok) throw new Error(`Oracle ${res.status}`);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let fullText = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const parsed = JSON.parse(line);
+            if (parsed.message?.content) {
+              fullText += parsed.message.content;
+              setAns(fullText);
+            }
+          } catch (_e) {}
+        }
+      }
+      const text = fullText || "The Oracle meditates in silence...";
       setHistory(h => {
         const next = [...h, { q: question, a: text }].slice(-20);
         LS.set(pairKey, next);
         return next;
       });
     } catch {
-      setAns("The Oracle is offline. Start Ollama locally (run: ollama serve) then try again.");
+      setAns("The Oracle is unreachable. Check your connection and try again.");
     }
     setLoading(false);
   };
@@ -706,7 +731,7 @@ function OracleChat({ city1, city2, city3 }) {
       <div style={{ textAlign: "center", marginBottom: "16px" }}>
         <div style={{ fontSize: "40px", animation: "float 3s ease-in-out infinite" }}>🔮</div>
         <h2 style={{ fontSize: "18px", fontWeight: 900, fontFamily: "'Playfair Display',serif", margin: "4px 0 2px" }}>The Oracle</h2>
-        <div style={{ fontSize: "9px", opacity: .25 }}>Local AI · {city3 ? `${city1.name}, ${city2.name} & ${city3.name}` : `${city1.name} & ${city2.name}`} · powered by Ollama gemma4</div>
+        <div style={{ fontSize: "9px", opacity: .25 }}>{city3 ? `${city1.name}, ${city2.name} & ${city3.name}` : `${city1.name} & ${city2.name}`} · powered by gemma4:e4b</div>
       </div>
       {history.length > 0 && (
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "6px" }}>
