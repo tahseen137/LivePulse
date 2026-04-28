@@ -370,13 +370,13 @@ function MoodTimeline({ city }) {
         {/* Hour dots at mood transitions */}
         {data.filter((_, i) => i % 6 === 0).map(d => (
           <circle key={d.h} cx={xS(d.h)} cy={yS(d.bpm)} r="2.5"
-            fill={getMoodColor(d.mood)} stroke="#0d0d0d" strokeWidth="1" />
+            fill={getMoodColor(d.mood)} stroke="#0d1228" strokeWidth="1" />
         ))}
 
         {/* Current hour marker */}
         <line x1={curX} x2={curX} y1={PT} y2={PT + cH}
           stroke={city.accent} strokeWidth="1" strokeDasharray="3,2" opacity="0.6" />
-        <circle cx={curX} cy={curY} r="4" fill={city.accent} stroke="#0d0d0d" strokeWidth="1.5" />
+        <circle cx={curX} cy={curY} r="4" fill={city.accent} stroke="#0d1228" strokeWidth="1.5" />
 
         {/* X-axis labels */}
         {[0, 6, 12, 18].map(h => (
@@ -448,7 +448,7 @@ function HeartbeatLine({ rate, color, w = 260 }) {
         <stop offset="75%" stopColor={color} stopOpacity="1" />
         <stop offset="100%" stopColor={color} stopOpacity="0" />
       </linearGradient></defs>
-      <path d={path} fill="none" stroke={`url(#hb${color.slice(1)})`} strokeWidth="2.5" />
+      <path d={path} fill="none" stroke={`url(#hb${color.slice(1)})`} strokeWidth="3" />
     </svg>
   );
 }
@@ -543,9 +543,9 @@ function CityPulse({ city }) {
   };
 
   return (
-    <div style={{ flex: 1, position: "relative", padding: "20px 16px", borderRadius: "14px", overflow: "hidden", minWidth: 0, background: `linear-gradient(135deg, ${city.accent}08 0%, #0d0d0d 100%)`, border: `1px solid ${city.accent}22` }}>
+    <div style={{ flex: 1, position: "relative", padding: "20px 16px", borderRadius: "14px", overflow: "hidden", minWidth: 0, background: `linear-gradient(135deg, ${city.accent}14 0%, #0d1228 100%)`, border: `1px solid ${city.accent}22` }}>
       {/* Aurora */}
-      <div style={{ position: "absolute", inset: 0, overflow: "hidden", opacity: .12, pointerEvents: "none" }}>
+      <div style={{ position: "absolute", inset: 0, overflow: "hidden", opacity: .22, pointerEvents: "none" }}>
         <div style={{ position: "absolute", width: "200%", height: "200%", top: "-50%", left: "-30%", background: `radial-gradient(ellipse, ${city.accent}33, transparent 70%)`, animation: "aurora 10s ease-in-out infinite alternate" }} />
       </div>
 
@@ -621,7 +621,7 @@ function TimeBridge({ city1, city2, city3 }) {
   const cities = city3 ? [city1, city2, city3] : [city1, city2];
   const phases = cities.map(c => getDayPhase(getCityTime(c.utc).getHours()));
   return (
-    <div style={{ padding: "14px", borderRadius: "10px", background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.05)", marginBottom: "10px" }}>
+    <div style={{ padding: "14px", borderRadius: "10px", background: "rgba(80,120,255,.06)", border: "1px solid rgba(255,255,255,.05)", marginBottom: "10px" }}>
       <div style={{ fontSize: "8px", letterSpacing: "3px", opacity: .3, marginBottom: "8px", textAlign: "center" }}>⏳ TIME BRIDGE</div>
       <div style={{ display: "flex", justifyContent: "space-around", alignItems: "center" }}>
         {cities.map((city, i) => (
@@ -645,93 +645,157 @@ function OracleChat({ city1, city2, city3 }) {
   const [q, setQ] = useState("");
   const [ans, setAns] = useState("");
   const [loading, setLoading] = useState(false);
+  const [queued, setQueued] = useState(0);
+  const [busyMsg, setBusyMsg] = useState("");
   const [history, setHistory] = useState(() => LS.get(pairKey, []));
 
+  const historyRef = useRef(history);
+  const pairKeyRef = useRef(pairKey);
+  const queueRef = useRef([]);
+  const processingRef = useRef(false);
+  const mountedRef = useRef(true);
+  const abortRef = useRef(null);
+
+  useEffect(() => { historyRef.current = history; }, [history]);
+  useEffect(() => { pairKeyRef.current = pairKey; }, [pairKey]);
+
   useEffect(() => {
-    setHistory(LS.get(pairKey, []));
-    setAns("");
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; abortRef.current?.abort(); };
+  }, []);
+
+  useEffect(() => {
+    abortRef.current?.abort();
+    queueRef.current = [];
+    processingRef.current = false;
+    if (mountedRef.current) {
+      setQueued(0); setLoading(false);
+      setHistory(LS.get(pairKey, []));
+      setAns(""); setBusyMsg("");
+    }
   }, [pairKey]);
 
-  const ask = async () => {
-    if (!q.trim() || loading) return;
-    setLoading(true); setAns("");
-    const question = q; setQ("");
+  const ollamaUrl = import.meta.env.VITE_OLLAMA_URL || "http://localhost:11434";
+  const ollamaKey = import.meta.env.VITE_OLLAMA_KEY || "";
 
-    const cityList = [city1, city2, city3].filter(Boolean);
-    const cityContext = cityList.map(c =>
-      `${c.name}, ${c.country}: Pop ${c.pop}, Density ${c.density}, Currency ${c.currency}, Language ${c.lang}, TZ ${c.tz}`
-    ).join("\n");
-
-    const systemPrompt = `You are "The Oracle" of LivePulse — an AI with deep awareness of cities worldwide. Today: ${new Date().toLocaleDateString()}. Answer queries about cities with poetic flair but grounded in specific data. Keep responses to 2-4 sentences.`;
-
-    const messages = [
-      { role: "system", content: systemPrompt },
-      ...history.flatMap(h => [
-        { role: "user", content: h.q },
-        { role: "assistant", content: h.a },
-      ]),
-      { role: "user", content: `Cities:\n${cityContext}\n\nQuestion: ${question}` },
-    ];
-
-    const ollamaUrl = import.meta.env.VITE_OLLAMA_URL || "http://localhost:11434";
-    const ollamaKey = import.meta.env.VITE_OLLAMA_KEY || "";
-    const ctrl = new AbortController();
-    const timeoutId = setTimeout(() => ctrl.abort(), 30000);
-    try {
-      const res = await fetch(`${ollamaUrl}/api/chat`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(ollamaKey && { "Authorization": `Bearer ${ollamaKey}` }),
-        },
-        body: JSON.stringify({
-          model: "gemma4:e4b",
-          messages,
-          stream: true,
-          think: false,
-          options: { temperature: 0.7, num_predict: 400 },
-        }),
-        signal: ctrl.signal,
-      });
-      clearTimeout(timeoutId);
-      if (!res.ok) throw new Error(`Oracle ${res.status}`);
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let fullText = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const parsed = JSON.parse(line);
-            if (parsed.message?.content) {
-              fullText += parsed.message.content;
-              setAns(fullText);
-            }
-          } catch { /* partial line — ignore */ }
+  const callOllama = async (messages) => {
+    let attempt = 0;
+    while (true) {
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
+      const timeoutId = setTimeout(() => ctrl.abort(), 45000);
+      try {
+        const res = await fetch(`${ollamaUrl}/api/chat`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(ollamaKey && { "Authorization": `Bearer ${ollamaKey}` }),
+          },
+          body: JSON.stringify({
+            model: "gemma4:e4b",
+            messages,
+            stream: true,
+            think: false,
+            options: { temperature: 0.7, num_predict: 600 },
+          }),
+          signal: ctrl.signal,
+        });
+        clearTimeout(timeoutId);
+        if (!res.ok) {
+          if (res.status >= 500 && attempt < 3) {
+            attempt++;
+            await new Promise(r => setTimeout(r, 1000 * (1 << (attempt - 1))));
+            continue;
+          }
+          throw new Error(`Oracle ${res.status}`);
         }
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let fullText = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const parsed = JSON.parse(line);
+              if (parsed.message?.content) {
+                fullText += parsed.message.content;
+                if (mountedRef.current) setAns(fullText);
+              }
+            } catch { /* partial line */ }
+          }
+        }
+        return fullText || "The Oracle meditates in silence...";
+      } catch (err) {
+        clearTimeout(timeoutId);
+        if (err.name === "AbortError") throw err;
+        if (attempt < 3) {
+          attempt++;
+          await new Promise(r => setTimeout(r, 1000 * (1 << (attempt - 1))));
+          continue;
+        }
+        throw err;
       }
-      const text = fullText || "The Oracle meditates in silence...";
-      setHistory(h => {
-        const next = [...h, { q: question, a: text }].slice(-20);
-        LS.set(pairKey, next);
-        return next;
-      });
-    } catch (err) {
-      clearTimeout(timeoutId);
-      setAns(err.name === "AbortError"
-        ? "The Oracle timed out. Please try again."
-        : "The Oracle is unreachable. Check your connection and try again.");
     }
-    setLoading(false);
   };
 
-  const clearHistory = () => { setHistory([]); LS.set(pairKey, []); setAns(""); };
+  const processQueue = async () => {
+    if (processingRef.current) return;
+    processingRef.current = true;
+    while (queueRef.current.length > 0) {
+      const { question, cityContext } = queueRef.current.shift();
+      if (mountedRef.current) { setQueued(queueRef.current.length); setLoading(true); setAns(""); }
+      const systemPrompt = `You are "The Oracle" of LivePulse — a mystical AI with encyclopedic awareness of cities worldwide. Today: ${new Date().toLocaleDateString()}. Respond in 4-6 sentences that blend poetic flair with grounded facts. Each response must include at least one specific data point or cultural fact (population figure, cost statistic, historical detail, cultural tradition, geographic feature, or local custom). Cover the practical angle (what it's like to live or visit), the cultural angle (arts, food, people, history), and the vibe angle (the feeling, energy, spirit of the place). You are a wise Oracle who sees cities as living souls.`;
+      const messages = [
+        { role: "system", content: systemPrompt },
+        ...historyRef.current.flatMap(h => [
+          { role: "user", content: h.q },
+          { role: "assistant", content: h.a },
+        ]),
+        { role: "user", content: `Cities:\n${cityContext}\n\nQuestion: ${question}` },
+      ];
+      try {
+        const text = await callOllama(messages);
+        if (mountedRef.current) {
+          setHistory(prev => {
+            const next = [...prev, { q: question, a: text }].slice(-20);
+            LS.set(pairKeyRef.current, next);
+            historyRef.current = next;
+            return next;
+          });
+          setAns(text);
+        }
+      } catch (err) {
+        if (mountedRef.current) {
+          setAns(err.name === "AbortError"
+            ? "The Oracle timed out. Please try again."
+            : "The Oracle is unreachable. Check your connection and try again.");
+        }
+      }
+    }
+    processingRef.current = false;
+    if (mountedRef.current) setLoading(false);
+  };
+
+  const ask = () => {
+    if (!q.trim()) return;
+    setBusyMsg("");
+    if (queueRef.current.length >= 3) { setBusyMsg("Oracle is busy. Try again in a moment."); return; }
+    const question = q; setQ("");
+    const cityContext = [city1, city2, city3].filter(Boolean).map(c =>
+      `${c.name}, ${c.country}: Pop ${c.pop}, Density ${c.density}, Currency ${c.currency}, Language ${c.lang}, TZ ${c.tz}`
+    ).join("\n");
+    queueRef.current.push({ question, cityContext });
+    setQueued(queueRef.current.length);
+    processQueue();
+  };
+
+  const clearHistory = () => { setHistory([]); historyRef.current = []; LS.set(pairKey, []); setAns(""); setBusyMsg(""); };
 
   return (
     <div style={{ maxWidth: "680px", margin: "0 auto" }}>
@@ -755,10 +819,12 @@ function OracleChat({ city1, city2, city3 }) {
         <input type="text" value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === "Enter" && ask()}
           placeholder={`Ask about ${city1.name} or ${city2.name}...`}
           style={{ flex: 1, padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(255,255,255,.08)", background: "rgba(255,255,255,.03)", color: "#fff", fontSize: "13px", outline: "none", fontFamily: "'DM Sans'" }} />
-        <button onClick={ask} disabled={loading} style={{ padding: "10px 18px", borderRadius: "8px", border: "none", background: `linear-gradient(135deg, ${city1.accent}, ${city2.accent})`, color: "#fff", fontWeight: 700, cursor: loading ? "wait" : "pointer", fontSize: "13px", fontFamily: "'DM Sans'", opacity: loading ? .5 : 1 }}>
+        <button onClick={ask} style={{ padding: "10px 18px", borderRadius: "8px", border: "none", background: `linear-gradient(135deg, ${city1.accent}, ${city2.accent})`, color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: "13px", fontFamily: "'DM Sans'", opacity: loading ? .7 : 1 }}>
           {loading ? "⏳" : "Ask"}
         </button>
       </div>
+      {queued > 0 && <div style={{ marginTop: "6px", fontSize: "10px", opacity: .5, textAlign: "center" }}>In queue... ({queued} waiting)</div>}
+      {busyMsg && <div style={{ marginTop: "6px", fontSize: "10px", color: "#FF5500", textAlign: "center" }}>{busyMsg}</div>}
       {ans && !history.find(h => h.a === ans) && (
         <div style={{ marginTop: "8px", padding: "12px", borderRadius: "8px", background: `linear-gradient(135deg, ${city1.accent}08, ${city2.accent}08)`, borderLeft: "3px solid rgba(255,255,255,.1)", fontStyle: "italic", fontSize: "13px", lineHeight: 1.6, fontFamily: "'Playfair Display',serif" }}>{ans}</div>
       )}
@@ -818,7 +884,7 @@ function DuelView({ city1, city2, city3 }) {
           </div>
         );
       })}
-      <div style={{ padding: "12px", borderRadius: "8px", background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.04)", marginTop: "12px", overflowX: "auto" }}>
+      <div style={{ padding: "12px", borderRadius: "8px", background: "rgba(80,120,255,.06)", border: "1px solid rgba(255,255,255,.04)", marginTop: "12px", overflowX: "auto" }}>
         <div style={{ fontSize: "8px", letterSpacing: "2px", opacity: .3, marginBottom: "8px" }}>📋 QUICK FACTS</div>
         {[["🌍 Continent", "continent"], ["💱 Currency", "currency"], ["🗣️ Language", "lang"], ["📐 Area", "area"], ["⏰ Timezone", "tz"]].map(([label, key], i) => (
           <div key={i} style={{ display: "flex", padding: "3px 0", borderBottom: i < 4 ? "1px solid rgba(255,255,255,.03)" : "none", fontSize: "10px" }}>
@@ -861,7 +927,7 @@ function ShareCard({ city1, city2, url, onClose }) {
 
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.75)", backdropFilter: "blur(6px)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px", animation: "fadeIn .2s" }}>
-      <div onClick={e => e.stopPropagation()} style={{ maxWidth: "460px", width: "100%", borderRadius: "16px", background: "#0e0e0e", border: "1px solid rgba(255,255,255,.1)", overflow: "hidden", animation: "slideUp .25s ease-out" }}>
+      <div onClick={e => e.stopPropagation()} style={{ maxWidth: "460px", width: "100%", borderRadius: "16px", background: "#0e152e", border: "1px solid rgba(255,255,255,.1)", overflow: "hidden", animation: "slideUp .25s ease-out" }}>
 
         {/* Preview */}
         <div style={{ padding: "22px 20px 18px", background: `linear-gradient(135deg, ${city1.accent}14 0%, #0e0e0e 45%, ${city2.accent}14 100%)`, borderBottom: "1px solid rgba(255,255,255,.06)" }}>
@@ -961,7 +1027,7 @@ function CostOfLivingPanel({ multiCities }) {
           </div>
         </div>
       ))}
-      <div style={{ marginTop: "16px", padding: "12px", borderRadius: "8px", background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.04)" }}>
+      <div style={{ marginTop: "16px", padding: "12px", borderRadius: "8px", background: "rgba(80,120,255,.06)", border: "1px solid rgba(255,255,255,.04)" }}>
         <div style={{ fontSize: "8px", letterSpacing: "2px", opacity: .3, marginBottom: "8px" }}>💰 MONTHLY TOTAL</div>
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${cities.length}, 1fr)`, gap: "8px" }}>
           {cities.map(c => {
@@ -1332,7 +1398,7 @@ export default function LivePulse() {
   const FREE_FEATURES = ["2-city comparison", "Real-time clocks & heartbeats", "Emotional weather", "AI Oracle (unlimited)", "Time bridge"];
 
   return (
-    <div style={{ minHeight: "100vh", background: "#080808", color: "#e0e0e0", fontFamily: "'DM Sans',sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#080d1f", color: "#f0f4ff", fontFamily: "'DM Sans',sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
         @keyframes aurora{0%{transform:translate(0,0) scale(1)}100%{transform:translate(20px,-15px) scale(1.1)}}
@@ -1340,7 +1406,7 @@ export default function LivePulse() {
         @keyframes slideUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
         @keyframes fadeIn{from{opacity:0}to{opacity:1}}
         *{box-sizing:border-box}
-        ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
+        ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:#1a2a5a;border-radius:3px}
         input::placeholder{color:rgba(255,255,255,.18)}
         .city-btn:hover{background:rgba(255,255,255,.06)!important;border-color:rgba(255,255,255,.15)!important}
       `}</style>
@@ -1348,7 +1414,7 @@ export default function LivePulse() {
       {/* HEADER */}
       <div style={{ textAlign: "center", padding: "24px 16px 8px", animation: "slideUp .6s ease-out" }}>
         <div style={{ display: "inline-flex", alignItems: "center", gap: "10px" }}>
-          <h1 style={{ fontSize: "clamp(24px,5vw,38px)", fontWeight: 900, margin: "0", fontFamily: "'Playfair Display',serif", background: "linear-gradient(135deg, #FF6B35, #F7C948, #4A90D9, #8EC5FC)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>LIVEPULSE</h1>
+          <h1 style={{ fontSize: "clamp(24px,5vw,38px)", fontWeight: 900, margin: "0", fontFamily: "'Playfair Display',serif", background: "linear-gradient(135deg, #FF5500, #FFD700, #2979FF, #80DFFF)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>LIVEPULSE</h1>
           {isPro && <span style={{ padding: "3px 9px", borderRadius: "20px", background: "linear-gradient(135deg, #F7C948, #FF6B35)", color: "#000", fontSize: "9px", fontWeight: 900, letterSpacing: "2px" }}>PRO</span>}
         </div>
         <div style={{ fontSize: "9px", letterSpacing: "3px", opacity: .2, marginTop: "2px" }}>FEEL A CITY BEFORE YOU GO</div>
