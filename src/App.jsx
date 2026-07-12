@@ -1,4 +1,48 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, Component } from "react";
+
+// ══════════════════════════════════════════════════════════
+// ERROR BOUNDARY — catches render errors and shows fallback
+// ══════════════════════════════════════════════════════════
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, info) {
+    console.error("[LivePulse] Uncaught render error:", error, info.componentStack);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          minHeight: "100vh", background: "#080d1f", display: "flex",
+          alignItems: "center", justifyContent: "center", flexDirection: "column",
+          fontFamily: "'DM Sans', sans-serif", color: "#f0f4ff", gap: 16, padding: 24,
+        }}>
+          <div style={{ fontSize: 48 }}>⚠️</div>
+          <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: 1 }}>Something went wrong</div>
+          <div style={{ fontSize: 13, opacity: 0.5, maxWidth: 400, textAlign: "center" }}>
+            {this.state.error?.message || "An unexpected error occurred."}
+          </div>
+          <button
+            onClick={() => { this.setState({ hasError: false, error: null }); }}
+            style={{
+              marginTop: 8, padding: "10px 24px", background: "#ffffff18",
+              border: "1px solid rgba(255,255,255,.15)", borderRadius: 8,
+              color: "#f0f4ff", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans'",
+            }}
+          >
+            Try again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // ══════════════════════════════════════════════════════════
 // CITY DATABASE — 50+ global cities with real data
@@ -1255,7 +1299,7 @@ function ProCitySelector({ multiCities, onToggleCity, onAddCity }) {
 // ══════════════════════════════════════════════════════════
 // MAIN APP
 // ══════════════════════════════════════════════════════════
-export default function LivePulse() {
+function LivePulse() {
   const [city1Id, setCity1Id] = useState(() => {
     const p = new URLSearchParams(window.location.search);
     const c1 = p.get("c1");
@@ -1611,5 +1655,13 @@ export default function LivePulse() {
         <div style={{ fontSize: "8px", letterSpacing: "2px", opacity: .08 }}>LIVEPULSE v3.2 · BUILT BY TAHSEEN · ORACLE POWERED BY OLLAMA</div>
       </div>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <LivePulse />
+    </ErrorBoundary>
   );
 }
